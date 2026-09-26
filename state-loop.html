@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>State Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E7E4DF;         /* light warm grey */
+    --ink: #111111;
+    --paper: #FFFFFF;
+    --muted: rgba(17,17,17,.38);
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body {
+    font: 500 15px/1.3 "Geist", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    user-select: none; -webkit-user-select: none;
+  }
+  #stage {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: grab; touch-action: none;
+  }
+  #stage.dragging { cursor: grabbing; }
+
+  /* The one shape. JS drives width, height, border-radius and background. */
+  #shape {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.08);
+    will-change: width, height, border-radius, background-color;
+  }
+
+  /* Each state's content sits centred at its own fixed size, so nothing reflows mid-morph. */
+  .content {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%) scale(.96);
+    opacity: 0; filter: blur(10px);
+    transition: opacity .28s ease, filter .28s ease, transform .28s ease;
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+  .content.on { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); }
+  .content.dark  { color: var(--paper); }
+  .content.light { color: var(--ink); }
+
+  /* content pieces */
+  .row { display: flex; align-items: center; gap: 10px; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .rec { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .line { height: 8px; border-radius: 4px; background: currentColor; opacity: .14; }
+  .h { font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+  .sub { opacity: .5; font-size: 13px; }
+  .big { font-size: 64px; font-weight: 700; letter-spacing: -.04em; line-height: 1; }
+  .bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.22); overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 64%; background: var(--paper); border-radius: 3px; }
+  .toggle { width: 36px; height: 22px; border-radius: 11px; background: rgba(0,0,0,.12); position: relative; }
+  .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--paper); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .toggle.on { background: var(--ink); }
+  .toggle.on::after { left: 17px; }
+  .art { width: 56px; height: 56px; border-radius: 12px; background: var(--ink); }
+  .ctl { display: flex; gap: 14px; font-size: 18px; }
+  .spread { justify-content: space-between; }
+
+  /* bottom indicator */
+  #dots {
+    position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%);
+    display: flex; gap: 10px; align-items: center;
+  }
+  #dots button {
+    width: 7px; height: 7px; padding: 0; border: 0; border-radius: 4px;
+    background: var(--muted); cursor: pointer;
+    transition: width .3s ease, background .3s ease;
+  }
+  #dots button.on { width: 22px; background: var(--ink); }
+  #hint {
+    position: fixed; left: 0; right: 0; top: 32px; text-align: center;
+    font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  }
+  #label { position: fixed; left: 0; right: 0; bottom: 64px; text-align: center; font-size: 13px; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .content { transition-duration: .01s; }
+    .rec { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="hint">Click to advance · Drag to scrub</div>
+<div id="stage" role="application" aria-label="Shape state loop. Click or press the right arrow to advance, drag to scrub.">
+  <div id="shape"></div>
+</div>
+<div id="label" aria-live="polite"></div>
+<div id="dots" role="tablist"></div>
+
+<script>
+/* ---------- States: only size, radius and colour change; content swaps with a blur. ---------- */
+const INK = [17,17,17], PAPER = [255,255,255];
+const STATES = [
+  { name: 'Dot',          w: 20,  h: 20,  r: 10, c: INK },
+  { name: 'Pill',         w: 132, h: 44,  r: 22, c: INK,
+    html: `<div class="row" style="width:132px;justify-content:center">Hello</div>` },
+  { name: 'Action',       w: 72,  h: 72,  r: 36, c: PAPER,
+    html: `<div style="font-size:30px;font-weight:300;line-height:1">+</div>` },
+  { name: 'Recording',    w: 176, h: 38,  r: 19, c: INK,
+    html: `<div class="row" style="width:176px;padding:0 16px;box-sizing:border-box" ><span class="dot rec" style="background:#fff"></span><span style="flex:1">Recording</span><span class="sub">0:12</span></div>` },
+  { name: 'Search',       w: 320, h: 52,  r: 26, c: PAPER,
+    html: `<div class="row" style="width:320px;padding:0 20px;box-sizing:border-box"><span style="font-size:16px">⌕</span><span class="sub" style="font-size:15px">Search anything</span></div>` },
+  { name: 'Card',         w: 280, h: 184, r: 24, c: PAPER,
+    html: `<div class="col" style="width:280px;padding:22px;box-sizing:border-box"><div class="h">New note</div><div class="sub">Edited just now</div><div class="line" style="width:100%;margin-top:8px"></div><div class="line" style="width:86%"></div><div class="line" style="width:58%"></div></div>` },
+  { name: 'Counter',      w: 184, h: 184, r: 48, c: INK,
+    html: `<div class="col" style="width:184px;align-items:center;gap:6px"><div class="big">12</div><div class="sub">states</div></div>` },
+  { name: 'Upload',       w: 260, h: 72,  r: 20, c: INK,
+    html: `<div class="col" style="width:260px;padding:0 20px;box-sizing:border-box;gap:10px"><div class="row spread"><span>Uploading</span><span class="sub">64%</span></div><div class="bar"><i></i></div></div>` },
+  { name: 'Player',       w: 320, h: 88,  r: 22, c: PAPER,
+    html: `<div class="row" style="width:320px;padding:0 16px;box-sizing:border-box;gap:14px"><div class="art"></div><div class="col" style="flex:1;gap:3px"><div style="font-weight:650">Morning Loop</div><div class="sub">Side A</div></div><div class="ctl"><span>▶︎</span></div></div>` },
+  { name: 'Settings',     w: 300, h: 216, r: 16, c: PAPER,
+    html: `<div class="col" style="width:300px;padding:20px 22px;box-sizing:border-box;gap:16px"><div class="h">Settings</div><div class="row spread"><span>Motion</span><span class="toggle on"></span></div><div class="row spread"><span>Sound</span><span class="toggle"></span></div><div class="row spread"><span>Haptics</span><span class="toggle on"></span></div></div>` },
+  { name: 'Toast',        w: 248, h: 52,  r: 14, c: INK,
+    html: `<div class="row" style="width:248px;padding:0 18px;box-sizing:border-box"><span>✓</span><span>Saved to library</span></div>` },
+];
+const N = STATES.length;
+
+/* ---------- DOM ---------- */
+const stage = document.getElementById('stage');
+const shape = document.getElementById('shape');
+const dotsEl = document.getElementById('dots');
+const labelEl = document.getElementById('label');
+
+const contents = STATES.map((s, i) => {
+  const el = document.createElement('div');
+  el.className = 'content ' + (s.c === INK ? 'dark' : 'light');
+  el.innerHTML = s.html || '';
+  shape.appendChild(el);
+  return el;
+});
+const dots = STATES.map((s, i) => {
+  const b = document.createElement('button');
+  b.setAttribute('role', 'tab');
+  b.setAttribute('aria-label', s.name);
+  b.addEventListener('pointerdown', e => e.stopPropagation());
+  b.addEventListener('click', e => { e.stopPropagation(); goTo(nearestLap(i)); interacted(); });
+  dotsEl.appendChild(b);
+  return b;
+});
+
+/* ---------- Motion model: one continuous position p, animated by a spring. ---------- */
+const mod = (a, n) => ((a % n) + n) % n;
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t * t * (3 - 2 * t); // smoothstep between neighbouring states
+
+let p = 0, v = 0, target = 0;           // position in "state units" (unbounded, wraps via mod)
+const STIFF = 170, DAMP = 22;
+let dragging = false, lastT = performance.now();
+
+function nearestLap(i) {                 // target index i on the lap closest to current p
+  const base = Math.round(p) - mod(Math.round(p), N) + i;
+  const cands = [base - N, base, base + N];
+  return cands.reduce((a, b) => Math.abs(b - p) < Math.abs(a - p) ? b : a);
+}
+function goTo(t) { target = t; }
+
+function render() {
+  const i0 = Math.floor(p), t = ease(p - i0);
+  const a = STATES[mod(i0, N)], b = STATES[mod(i0 + 1, N)];
+  const w = lerp(a.w, b.w, t), h = lerp(a.h, b.h, t), r = lerp(a.r, b.r, t);
+  const c = a.c.map((x, k) => Math.round(lerp(x, b.c[k], t)));
+  shape.style.width = w + 'px';
+  shape.style.height = h + 'px';
+  shape.style.borderRadius = r + 'px';
+  shape.style.backgroundColor = `rgb(${c})`;
+
+  const active = mod(Math.round(p), N);
+  if (render.active !== active) {
+    contents.forEach((el, k) => el.classList.toggle('on', k === active));
+    dots.forEach((d, k) => { d.classList.toggle('on', k === active); d.setAttribute('aria-selected', k === active); });
+    labelEl.textContent = `${String(active + 1).padStart(2, '0')} / ${N} · ${STATES[active].name}`;
+    render.active = active;
+  }
+}
+
+function tick(now) {
+  const dt = Math.min(0.032, (now - lastT) / 1000); lastT = now;
+  if (!dragging) {
+    const f = -STIFF * (p - target) - DAMP * v;
+    v += f * dt; p += v * dt;
+    if (Math.abs(p - target) < 1e-4 && Math.abs(v) < 1e-4) { p = target; v = 0; }
+  }
+  autoplay(now);
+  render();
+  requestAnimationFrame(tick);
+}
+
+/* ---------- Click and drag ---------- */
+const PX_PER_STATE = 140;                // horizontal drag distance for one state
+let startX = 0, startP = 0, moved = false, samples = [];
+
+stage.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  stage.setPointerCapture(e.pointerId);
+  dragging = true; moved = false;
+  startX = e.clientX; startP = p; v = 0;
+  samples = [{ x: e.clientX, t: e.timeStamp }];
+  interacted();
+});
+stage.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - startX;
+  if (Math.abs(dx) > 4) { moved = true; stage.classList.add('dragging'); }
+  if (!moved) return;
+  p = startP - dx / PX_PER_STATE;       // drag left = forward, right = back
+  samples.push({ x: e.clientX, t: e.timeStamp });
+  if (samples.length > 6) samples.shift();
+});
+function release(e) {
+  if (!dragging) return;
+  dragging = false; stage.classList.remove('dragging');
+  if (!moved) {                          // a click: advance one state (shift-click goes back)
+    goTo(Math.round(target) + (e.shiftKey ? -1 : 1));
+  } else {
+    const s0 = samples[0], s1 = samples[samples.length - 1];
+    const vx = s1.t > s0.t ? (s1.x - s0.x) / (s1.t - s0.t) : 0;   // px/ms
+    v = -vx * 1000 / PX_PER_STATE;
+    goTo(Math.round(p + v * 0.12));      // fling a little further on a fast swipe
+  }
+  interacted();
+}
+stage.addEventListener('pointerup', release);
+stage.addEventListener('pointercancel', release);
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') { goTo(Math.round(target) + 1); interacted(); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { goTo(Math.round(target) - 1); interacted(); e.preventDefault(); }
+});
+
+/* ---------- Idle autoplay: one lap = 28 beats at 120 BPM = 14 s. Any interaction pauses it. ---------- */
+const BEAT_MS = 60000 / 120;
+const BEATS = [2, 3, 2, 2, 3, 3, 2, 3, 3, 3, 2];   // beats each state holds; sums to 28
+const IDLE_MS = 5000;
+let nextStep = performance.now() + BEATS[0] * BEAT_MS;
+function interacted() { nextStep = performance.now() + IDLE_MS; }
+function autoplay(now) {
+  if (dragging || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (now >= nextStep) {
+    const t = Math.round(target) + 1;
+    goTo(t);
+    nextStep += BEATS[mod(t, N)] * BEAT_MS;
+    if (nextStep < now) nextStep = now + BEATS[mod(t, N)] * BEAT_MS;   // tab was hidden; don't burst
+  }
+}
+
+render();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
