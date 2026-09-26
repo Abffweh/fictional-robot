@@ -1,0 +1,4 @@
+music/track.wav
+out/*
+!out/ui-loop.mp4
+!out/sheet.png

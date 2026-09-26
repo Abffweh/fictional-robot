@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>One Shape</title>
+<style>
+@font-face{font-family:"Geist";src:url("fonts/Geist-Variable.woff2") format("woff2");font-weight:100 900;font-display:block}
+*{box-sizing:border-box}
+html,body{margin:0;width:1440px;height:1440px;overflow:hidden;background:#ECE9E4}
+body{font-family:"Geist",system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}
+#stage{position:absolute;left:0;top:0;width:1440px;height:1440px;overflow:hidden;background:#ECE9E4}
+#world{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
+#shape{position:absolute;overflow:hidden;isolation:isolate}
+#inner,.layer,.pt{position:absolute;left:0;top:0;width:0;height:0}
+.layer,.pt{transform-origin:0 0}
+.t{position:absolute;white-space:nowrap;font-feature-settings:"tnum" 1,"ss01" 1}
+.ico{position:absolute;display:block}
+.ico svg{display:block;width:100%;height:100%;overflow:visible}
+.box{position:absolute}
+#cursor{position:absolute;left:0;top:0;width:60px;height:60px;transform-origin:0 0}
+#cursor svg{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 2px 3px rgba(20,18,15,.28))}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world"><div id="shape"><div id="inner"></div></div></div>
+  <div id="cursor"><svg viewBox="0 0 24 24"><path d="M5.2 2.8v16.6l4.2-4 2.9 6.6 3.1-1.4-2.9-6.4h5.9z" fill="#141414" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+</div>
+<script>
+// ---------------------------------------------------------------------------
+// Beat grid from music/analyze.py (seconds from the loop's first downbeat).
+// ---------------------------------------------------------------------------
+const BEATS = /*BEATS*/[0.00000,0.50068,1.00063,1.50059,1.99982,2.50050,3.00045,3.50041,3.99964,4.50032,5.00027,5.50023,5.99946,6.49941,7.00009,7.50077,8.00000,8.50068,8.99991,9.50059,10.00054,10.50050,11.00045,11.50041,12.00036,12.50032,13.00027,13.49950,13.99946]/*END*/;
+const FPS = 60;
+const T = Math.round(BEATS[28] * FPS) / FPS;      // loop period, whole frames
+const B = i => BEATS[i];
+
+// ---------------------------------------------------------------------------
+// Springs. step() is the closed-form unit step response of a damped spring;
+// a Track is the sum of one step response per target change, evaluated
+// periodically, so a value is only ever a function of t and t = T equals t = 0
+// in position and velocity.
+// ---------------------------------------------------------------------------
+function step(x, resp, z) {
+  if (x <= 0) return 0;
+  const w = 2 * Math.PI / resp;
+  if (z >= 0.999) return 1 - Math.exp(-w * x) * (1 + w * x);
+  const wd = w * Math.sqrt(1 - z * z);
+  return 1 - Math.exp(-z * w * x) * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x));
+}
+const SP = {
+  shape: [0.46, 0.8], press: [0.2, 0.74], cam: [0.64, 0.92], cur: [0.36, 0.86],
+  in: [0.3, 1], out: [0.16, 1], fast: [0.28, 0.82], soft: [0.42, 0.88],
+  lead: [0.24, 0.8], trail: [0.5, 0.86], draw: [0.38, 1], bar: [0.44, 0.78], color: [0.2, 1],
+};
+class Track {
+  constructor(v) { this.init = v; this.ev = []; this.done = false; }
+  to(t, v, sp = SP.shape) { this.ev.push({ t: ((t % T) + T) % T, v, resp: sp[0], z: sp[1] }); return this; }
+  seal() {
+    this.ev.sort((a, b) => a.t - b.t);
+    this.base = this.ev.length ? this.ev[this.ev.length - 1].v : this.init;
+    let prev = this.base;
+    for (const e of this.ev) { e.d = e.v - prev; prev = e.v; }
+    this.done = true;
+  }
+  at(t) {
+    if (!this.done) this.seal();
+    let v = this.base;
+    for (const e of this.ev) {
+      if (e.d === 0) continue;
+      v += e.d * (step(t - e.t, e.resp, e.z) + step(t - e.t + T, e.resp, e.z) - 1);
+    }
+    return v;
+  }
+}
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+class Color {
+  constructor(h) { this.c = hex(h).map(v => new Track(v)); }
+  to(t, h, sp = SP.shape) { hex(h).forEach((v, i) => this.c[i].to(t, v, sp)); return this; }
+  at(t) { const [r, g, b] = this.c.map(c => Math.round(clamp(c.at(t), 0, 255))); return `rgb(${r},${g},${b})`; }
+}
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const smooth = (a, b, v) => { const x = clamp((v - a) / (b - a)); return x * x * (3 - 2 * x); };
+
+// ---------------------------------------------------------------------------
+// Palette
+// ---------------------------------------------------------------------------
+const INK = '#141414', PAPER = '#FFFFFF', LIME = '#CDF464', CORAL = '#FF5B35',
+      BLUE = '#3D5CFF', MUTED = '#8C8883', LINE = '#E8E4DE', DIM = '#D9D5CF', HOVER = '#262626';
+
+// ---------------------------------------------------------------------------
+// DOM helpers (built once; seek() only writes styles)
+// ---------------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const inner = $('inner'), shapeEl = $('shape'), world = $('world'), cursorEl = $('cursor');
+function div(parent, css = {}, cls) {
+  const e = document.createElement('div');
+  if (cls) e.className = cls;
+  Object.assign(e.style, css);
+  parent.appendChild(e);
+  return e;
+}
+const PATHS = {
+  play: '<path d="M8 5.9v12.2a1 1 0 0 0 1.53.85l9.7-6.1a1 1 0 0 0 0-1.7l-9.7-6.1A1 1 0 0 0 8 5.9z" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="6.2" y="5" width="4.1" height="14" rx="1.3" fill="currentColor" stroke="none"/><rect x="13.7" y="5" width="4.1" height="14" rx="1.3" fill="currentColor" stroke="none"/>',
+  prev: '<path d="M18.5 6.4v11.2a1 1 0 0 1-1.56.83l-7.7-5.6a1 1 0 0 1 0-1.66l7.7-5.6a1 1 0 0 1 1.56.83z" fill="currentColor" stroke="none"/><rect x="5.5" y="5.5" width="2.6" height="13" rx="1.3" fill="currentColor" stroke="none"/>',
+  heart: '<path d="M12 19.4s-7.4-4.3-7.4-9.9a4.1 4.1 0 0 1 7.4-2.4 4.1 4.1 0 0 1 7.4 2.4c0 5.6-7.4 9.9-7.4 9.9z"/>',
+  speaker: '<path d="M4 9.4h3.1L11.4 6v12l-4.3-3.4H4z"/><path class="w1" d="M15.1 9.4a3.6 3.6 0 0 1 0 5.2"/><path class="w2" d="M17.9 6.6a7.6 7.6 0 0 1 0 10.8"/>',
+  bolt: '<path d="M13.3 3 5.6 13.1h6.1L10.7 21l7.7-10.1h-6.1z"/>',
+  clock: '<circle cx="12" cy="12" r="8.4"/><path d="M12 7.7V12l2.9 1.8"/>',
+  pulse: '<path d="M3.4 12.2h3.7l2.4-5.6 5 11.2 2.4-5.6h3.7"/>',
+  check: '<path d="M6.6 12.7l3.6 3.6 7.3-8.1" pathLength="1" stroke-dasharray="1 1"/>',
+  ring: '<circle cx="12" cy="12" r="9.2" stroke="#E8E4DE"/><circle class="arc" cx="12" cy="12" r="9.2" stroke="#141414"/>',
+};
+function icon(parent, name, size, color, x = 0, y = 0) {
+  const e = div(parent, { width: size + 'px', height: size + 'px', color, left: -size / 2 + 'px', top: -size / 2 + 'px' }, 'ico');
+  e.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PATHS[name]}</svg>`;
+  const p = div(parent, {}, 'pt');
+  p.appendChild(e);
+  p.style.transform = `translate(${x}px,${y}px)`;
+  return p;
+}
+// text anchored at (x, y) = vertical centre; align left | center | right
+function text(parent, str, x, y, size, weight, color, align = 'left', extra = {}) {
+  const e = div(parent, Object.assign({
+    fontSize: size + 'px', lineHeight: size + 'px', height: size + 'px', fontWeight: weight, color,
+    left: x + 'px', top: (y - size / 2 - size * 0.04) + 'px', letterSpacing: size >= 24 ? '-0.015em' : '0',
+  }, extra), 't');
+  e.textContent = str;
+  if (align === 'center') e.style.transform = 'translateX(-50%)';
+  if (align === 'right') e.style.transform = 'translateX(-100%)';
+  return e;
+}
+
+// A layer is content that blurs in and out as a whole; entry and exit are
+// separate springs so text in a morphing container never double-exposes.
+const layers = [];
+class Layer {
+  constructor(fx = 0, fy = 0, parent = inner) {
+    this.el = div(parent, {}, 'layer'); this.vis = new Track(0); this.fx = fx; this.fy = fy; this.blur = 12;
+    layers.push(this);
+  }
+  show(t) { this.vis.to(t, 1, SP.in); return this; }
+  hide(t) { this.vis.to(t, 0, SP.out); return this; }
+  apply(t) {
+    const v = clamp(this.vis.at(t));
+    const s = this.el.style;
+    if (v < 0.002) { s.display = 'none'; return v; }
+    s.display = '';
+    s.opacity = v.toFixed(4);
+    s.filter = v > 0.995 ? 'none' : `blur(${((1 - v) * this.blur).toFixed(2)}px)`;
+    const k = 0.93 + 0.07 * v;
+    s.transform = `translate(${this.fx}px,${this.fy}px) scale(${k.toFixed(4)}) translate(${-this.fx}px,${-this.fy}px)`;
+    return v;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Everything below needs Geist's metrics, so it runs after the font loads.
+// ---------------------------------------------------------------------------
+const SFX = [];
+const sfx = (t, type, gain = 1) => SFX.push({ t: ((t % T) + T) % T, type, gain });
+let seek = () => {};
+
+async function build() {
+  await Promise.all([400, 450, 500, 560, 600].map(w => document.fonts.load(`${w} 30px Geist`)));
+  const measure = (str, size, weight) => {
+    const e = text(document.body, str, 0, 0, size, weight, '#000');
+    const w = e.getBoundingClientRect().width; e.remove(); return w;
+  };
+
+  // ---- the one shape + camera ---------------------------------------------
+  const shape = { cx: new Track(0), cy: new Track(0), w: new Track(260), h: new Track(92), r: new Track(46), col: new Color(INK) };
+  const cam = { x: new Track(0), y: new Track(0), lz: new Track(Math.log(2.7)) };
+  const fit = (w, h) => Math.min(2.7, 0.68 * 1440 / w, 0.66 * 1440 / h);
+  function state(t, S) {
+    const cx = S.cx || 0, cy = S.cy || 0;
+    shape.w.to(t, S.w); shape.h.to(t, S.h); shape.r.to(t, S.r ?? Math.min(S.w, S.h) / 2);
+    shape.cx.to(t, cx); shape.cy.to(t, cy); shape.col.to(t, S.col, SP.color);
+    cam.x.to(t, cx, SP.cam); cam.y.to(t, cy, SP.cam); cam.lz.to(t, Math.log(fit(S.w, S.h)), SP.cam);
+  }
+  function squish(t, S, dw, dh, col) {
+    shape.w.to(t, S.w + dw, SP.press); shape.h.to(t, S.h + dh, SP.press);
+    if (col) shape.col.to(t, col, SP.press);
+  }
+
+  // ---- cursor ---------------------------------------------------------------
+  const cur = { x: new Track(150), y: new Track(128), p: new Track(0) };
+  const go = (t, x, y, sp = SP.cur) => { cur.x.to(t, x, sp); cur.y.to(t, y, sp); };
+  const press = (t, type = 'press') => { cur.p.to(t, 1, SP.press); sfx(t, type); };
+  const release = (t, type = 'release') => { cur.p.to(t, 0, SP.press); if (type) sfx(t, type); };
+  const ARRIVE = 0.42;          // cursor leaves this long before the beat it acts on
+
+  // =========================================================================
+  // CONTENT
+  // =========================================================================
+  // ---- button ---------------------------------------------------------------
+  const L_btn = new Layer();
+  const btnLabel = measure('Play mix', 30, 560);
+  const BTN = { w: Math.round(22 + 14 + btnLabel + 2 * 46), h: 92, col: INK };
+  {
+    const g = -(22 + 14 + btnLabel) / 2;
+    icon(L_btn.el, 'play', 24, '#fff', g + 11, 0);
+    text(L_btn.el, 'Play mix', g + 22 + 14, 0, 30, 560, '#fff');
+  }
+
+  // ---- loader + check ---------------------------------------------------------
+  const L_load = new Layer();
+  const ring = icon(L_load.el, 'ring', 64, INK);
+  const arc = ring.querySelector('.arc');
+  const loadP = new Track(0);
+  const L_check = new Layer();
+  const checkP = icon(L_check.el, 'check', 64, INK);
+  const checkPath = checkP.querySelector('path');
+  const checkX = new Track(0), checkDraw = new Track(0);
+  const readyW = measure('Ready', 30, 600);
+  const READY = { w: Math.round(30 + 14 + readyW + 2 * 40), h: 112, col: LIME };
+  const readyCheckX = -READY.w / 2 + 40 + 15;
+  const L_ready = new Layer(readyCheckX + 29, 0);
+  text(L_ready.el, 'Ready', readyCheckX + 29, 0, 30, 600, INK);
+  const LOAD = { w: 112, h: 112, col: PAPER };
+
+  // ---- cover (shared by island and player) -------------------------------------
+  const cover = { x: new Track(-162), s: new Track(64), r: new Track(18), vis: new Track(0) };
+  const coverEl = div(inner, { background: CORAL, overflow: 'hidden' }, 'box');
+  const disc = div(coverEl, { position: 'absolute', left: '18%', top: '18%', width: '64%', height: '64%', borderRadius: '50%', background: INK });
+  div(disc, { position: 'absolute', left: '36%', top: '36%', width: '28%', height: '28%', borderRadius: '50%', background: LIME });
+  div(disc, { position: 'absolute', left: '47%', top: '10%', width: '6%', height: '6%', borderRadius: '50%', background: '#fff' });
+
+  // ---- island -------------------------------------------------------------------
+  const ISL = { w: 420, h: 96, col: INK };
+  const L_isl = new Layer();
+  text(L_isl.el, 'Midnight Drive', -114, -11, 20, 560, '#fff');
+  text(L_isl.el, 'Aru Kei', -114, 13, 16, 450, '#9A958F');
+  const waves = [0, 1, 2, 3, 4].map(i => div(L_isl.el, { left: (148 + i * 10) + 'px', width: '5px', borderRadius: '3px', background: LIME }, 'box'));
+
+  // ---- player ---------------------------------------------------------------------
+  const PLAYER = { w: 680, h: 316, r: 52, col: PAPER };
+  const X0 = -48, X1 = 292, PY = 86;
+  const L_ply = new Layer();
+  text(L_ply.el, 'Midnight Drive', X0, -100, 30, 600, INK);
+  text(L_ply.el, 'Aru Kei · Nightcall', X0, -64, 20, 450, MUTED);
+  icon(L_ply.el, 'heart', 28, INK, 278, -100);
+  icon(L_ply.el, 'prev', 28, INK, X0 + 14, 12);
+  const nextI = icon(L_ply.el, 'prev', 28, INK, 128, 12);
+  nextI.firstChild.style.transform = 'scaleX(-1)';
+  const playBtn = div(L_ply.el, {}, 'pt');
+  const playBtnBg = div(playBtn, { left: '-36px', top: '-36px', width: '72px', height: '72px', borderRadius: '50%', background: INK }, 'box');
+  const pauseG = new Layer(0, 0, playBtn); icon(pauseG.el, 'pause', 28, '#fff'); pauseG.blur = 6;
+  const playG = new Layer(0, 0, playBtn); icon(playG.el, 'play', 28, '#fff', 1.5, 0); playG.blur = 6;
+  const playBtnS = new Track(1);
+  const PBX = 56, PBY = 12;
+  const tNow = text(L_ply.el, '1:20', X0, 118, 16, 500, MUTED);
+  text(L_ply.el, '3:42', X1, 118, 16, 500, MUTED, 'right');
+
+  // ---- progress bar -> volume slider (one set of elements, morphing) ----------
+  const G = {
+    x0: new Track(X0), x1: new Track(X1), y: new Track(PY), h: new Track(6), r: new Track(3), fr: new Track(3),
+    tw: new Track(18), th: new Track(18), tr: new Track(9), inset: new Track(0),
+    trk: new Color(LINE), fill: new Color(INK), thumb: new Color(INK), vis: new Track(0),
+  };
+  const trkEl = div(inner, {}, 'box'), fillEl = div(inner, {}, 'box'), thumbEl = div(inner, {}, 'box');
+  const VOL = { w: 600, h: 120, col: INK };
+  const L_vol = new Layer();
+  const spk = icon(L_vol.el, 'speaker', 28, '#fff', -252, 0);
+  const w1 = spk.querySelector('.w1'), w2 = spk.querySelector('.w2');
+  const volTxt = text(L_vol.el, '100%', 256, 0, 24, 560, '#fff', 'right');
+
+  // ---- switch ------------------------------------------------------------------------
+  const SW = { w: 500, h: 132, col: PAPER };
+  const L_sw = new Layer();
+  text(L_sw.el, 'Double time', -204, -15, 28, 600, INK);
+  const L_subA = new Layer(-204, 17, L_sw.el); text(L_subA.el, '120 BPM', -204, 17, 20, 450, MUTED); L_subA.blur = 8;
+  const L_subB = new Layer(-204, 17, L_sw.el); text(L_subB.el, '240 BPM', -204, 17, 20, 450, BLUE); L_subB.blur = 8;
+  const swTrackEl = div(L_sw.el, { left: '114px', top: '-30px', width: '104px', height: '60px', borderRadius: '30px' }, 'box');
+  const swTrack = new Color('#E2DED8');
+  const knob = { l: new Track(120), r: new Track(168), s: new Track(1), vis: new Track(0) };
+  const knobEl = div(inner, { background: '#fff', boxShadow: '0 1px 2px rgba(20,18,15,.14),0 3px 8px rgba(20,18,15,.10)' }, 'box');
+  const KNOB_ON = [164, 212], KNOB_OFF = [120, 168];
+
+  // ---- status icon + icon row ------------------------------------------------------
+  const IC = 188;
+  const ICON1 = { w: 132, h: 132, col: BLUE, cx: IC };
+  const ROWX = [IC, 84, -20, -124];
+  const ROW = { w: 452, h: 132, col: BLUE, cx: (ROWX[0] + ROWX[3]) / 2 };
+  const rowIcons = ['bolt', 'clock', 'heart', 'pulse'].map((n, i) => {
+    const size = new Track(44), x = new Track(IC), vis = new Track(0);
+    const el = icon(inner, n, 48, '#fff');
+    return { el, size, x, vis };
+  });
+
+  // ---- chart ----------------------------------------------------------------------------
+  const CHART = { w: 700, h: 500, r: 48, col: PAPER };
+  const L_ch = new Layer();
+  text(L_ch.el, 'Listening', -302, -190, 26, 600, INK);
+  const L_subW = new Layer(-302, -158, L_ch.el); text(L_subW.el, 'This week · 13h 48m', -302, -158, 18, 450, MUTED); L_subW.blur = 8;
+  const L_subM = new Layer(-302, -158, L_ch.el); text(L_subM.el, 'This month · 48h 12m', -302, -158, 18, 450, MUTED); L_subM.blur = 8;
+  div(L_ch.el, { left: '118px', top: '-202px', width: '184px', height: '44px', borderRadius: '22px', background: '#EFECE7' }, 'box');
+  const indEl = div(L_ch.el, { top: '-198px', height: '36px', borderRadius: '18px', background: '#fff', boxShadow: '0 1px 2px rgba(20,18,15,.10),0 2px 6px rgba(20,18,15,.06)' }, 'box');
+  const ind = { l: new Track(122), r: new Track(210) };
+  const tabW = text(L_ch.el, 'Week', 166, -180, 17, 560, INK, 'center');
+  const tabM = text(L_ch.el, 'Month', 254, -180, 17, 560, MUTED, 'center');
+  const tabWc = new Color(INK), tabMc = new Color(MUTED);
+  const BASE = 160, BAR_W = 52, BAR_X = i => -276 + 92 * i;
+  const WEEK = [1.6, 2.4, 1.2, 2.9, 2.2, 2.0, 1.5].map(v => v / 3.2 * 220);
+  const MONTH = [5.8, 7.2, 6.4, 8.4, 6.9, 7.6, 5.9].map(v => v / 9.0 * 220);
+  const bars = WEEK.map((_, i) => ({ h: new Track(0), c: new Color(INK), el: div(L_ch.el, { left: (BAR_X(i) - BAR_W / 2) + 'px', width: BAR_W + 'px', borderRadius: '14px' }, 'box') }));
+  const L_xW = new Layer(0, 194, L_ch.el); 'MTWTFSS'.split('').forEach((d, i) => text(L_xW.el, d, BAR_X(i), 194, 16, 500, MUTED, 'center')); L_xW.blur = 8;
+  const L_xM = new Layer(0, 194, L_ch.el); [1, 5, 9, 13, 17, 21, 25].forEach((d, i) => text(L_xM.el, String(d), BAR_X(i), 194, 16, 500, MUTED, 'center')); L_xM.blur = 8;
+  const tip = { x: new Track(0), y: new Track(-90), w: new Track(160), vis: new Track(0) };
+  const tipEl = div(L_ch.el, { height: '44px', borderRadius: '22px', background: INK, overflow: 'hidden' }, 'box');
+  const tipTexts = ['Sep 13 · 8h 24m', 'Sep 21 · 7h 36m'].map(s => {
+    const L = new Layer(0, 0, tipEl); L.blur = 6;
+    const tw = measure(s, 17, 560);
+    const e = text(L.el, s, 0, 22, 17, 560, '#fff', 'center');
+    return { L, w: tw + 36, e };
+  });
+
+  // =========================================================================
+  // TIMELINE — 7 bars, one change per beat
+  // =========================================================================
+  const REST = [150, 128];
+
+  // bar 7 beat 4 -> bar 1: collapse into the button, the loop seam
+  state(B(27), BTN); L_ch.hide(B(27)); L_btn.show(B(27) + 0.1); sfx(B(27), 'collapse');
+  go(B(27) + 0.02, ...REST);
+  bars.forEach(b => b.h.to(B(27) + 0.35, 0, SP.fast));
+
+  // bar 1
+  go(B(0) - ARRIVE, 46, 14);
+  squish(B(0), BTN, 10, 4, HOVER); sfx(B(0), 'hover');                                     // b0 hover
+  squish(B(1), BTN, -12, -6, INK); press(B(1));                                             // b1 press
+  release(B(2), null); state(B(2), LOAD); L_btn.hide(B(2)); L_load.show(B(2) + 0.08);        // b2 -> loader
+  loadP.to(B(2), 0.16, SP.soft); sfx(B(2), 'pop'); go(B(2) + 0.1, 118, 96, SP.soft);
+  loadP.to(B(3), 0.5, SP.soft); sfx(B(3), 'tick');                                          // b3
+
+  // bar 2
+  loadP.to(B(4), 0.84, SP.soft); sfx(B(4), 'tick');                                         // b4
+  loadP.to(B(5), 1, SP.fast); shape.col.to(B(5), LIME, SP.fast);                              // b5 done
+  L_load.hide(B(5) + 0.1); L_check.show(B(5) + 0.1); checkDraw.to(B(5) + 0.12, 1, SP.draw); sfx(B(5), 'success');
+  state(B(6), READY); checkX.to(B(6), readyCheckX); L_ready.show(B(6) + 0.08); sfx(B(6), 'pop'); // b6 Ready
+  state(B(7), ISL); L_check.hide(B(7)); L_ready.hide(B(7)); L_isl.show(B(7) + 0.1);           // b7 island
+  cover.vis.to(B(7) + 0.1, 1, SP.in); sfx(B(7), 'pop');
+  loadP.to(B(7), 0, SP.fast); checkDraw.to(B(7) + 0.3, 0, SP.fast); checkX.to(B(7) + 0.3, 0, SP.fast);
+
+  // bar 3
+  go(B(8) - ARRIVE, 64, 12);
+  squish(B(8), ISL, -14, -4); press(B(8));                                                     // b8 press island
+  release(B(9), null); state(B(9), PLAYER); L_isl.hide(B(9)); L_ply.show(B(9) + 0.1);           // b9 expand
+  cover.x.to(B(9), -190); cover.s.to(B(9), 204); cover.r.to(B(9), 30);
+  G.vis.to(B(9) + 0.12, 1, SP.in); pauseG.show(B(9)); sfx(B(9), 'expand');
+  go(B(10) - ARRIVE, PBX + 6, PBY + 8);
+  press(B(10), 'tap'); playBtnS.to(B(10), 0.9, SP.press); release(B(10) + 0.13, null);           // b10 pause
+  playBtnS.to(B(10) + 0.13, 1, SP.press); pauseG.hide(B(10)); playG.show(B(10) + 0.06);
+  press(B(11), 'tap'); playBtnS.to(B(11), 0.9, SP.press); release(B(11) + 0.13, null);           // b11 play
+  playBtnS.to(B(11) + 0.13, 1, SP.press); playG.hide(B(11)); pauseG.show(B(11) + 0.06);
+
+  // playback clock (pure): playing on [b7, b10) and [b11, b15)
+  const PLAYING = [[B(7), B(10)], [B(11), B(15)]];
+  const played = t => PLAYING.reduce((a, [s, e]) => a + clamp(t, s, e) - s, 0);
+  const vPlay = t => 0.36 + played(t) / 222;
+
+  // bar 4: scrub, direct manipulation from b12 to b17
+  const HOLD = [B(12), B(17)];
+  const thumbAt = v => X0 + v * (X1 - X0);
+  go(B(12) - ARRIVE, thumbAt(vPlay(B(12))), PY);
+  press(B(12), 'grab'); G.tw.to(B(12), 26, SP.press); G.th.to(B(12), 26, SP.press); G.tr.to(B(12), 13, SP.press); // b12 grab
+  go(B(13), thumbAt(0.72), PY + 2, SP.soft); sfx(B(13), 'tick');                                 // b13 drag
+  go(B(14), X1 + 72, PY + 4, SP.soft); sfx(B(14), 'stretch');                                    // b14 past the end
+  // b15 the bar becomes the volume slider, still held
+  state(B(15), VOL); L_ply.hide(B(15)); cover.vis.to(B(15), 0, SP.out); L_vol.show(B(15) + 0.1); sfx(B(15), 'pop');
+  G.x0.to(B(15), -300); G.x1.to(B(15), 300); G.y.to(B(15), 0); G.h.to(B(15), 120); G.r.to(B(15), 0); G.fr.to(B(15), 0);
+  G.tw.to(B(15), 6); G.th.to(B(15), 52); G.tr.to(B(15), 3); G.inset.to(B(15), 22);
+  G.trk.to(B(15), INK, SP.color); G.fill.to(B(15), CORAL, SP.color); G.thumb.to(B(15), PAPER, SP.color);
+  go(B(15), 304, 4, SP.soft);
+
+  // bar 5
+  go(B(16), -300 + 0.6 * 600 - 22, 4, SP.soft); sfx(B(16), 'tick');                              // b16 volume 60%
+  release(B(17)); G.th.to(B(17), 40, SP.press);                                                    // b17 release
+  state(B(18), SW); L_vol.hide(B(18)); G.vis.to(B(18), 0, SP.out); L_sw.show(B(18) + 0.1);           // b18 switch
+  L_subA.show(B(18) + 0.1); knob.vis.to(B(18) + 0.1, 1, SP.in); sfx(B(18), 'pop');
+  go(B(18) + 0.08, 150, 8);
+  // reset the bar geometry while it is invisible, so b9 finds the player layout
+  const R0 = B(18) + 0.5;
+  G.x0.to(R0, X0, SP.fast); G.x1.to(R0, X1, SP.fast); G.y.to(R0, PY, SP.fast); G.h.to(R0, 6, SP.fast); G.r.to(R0, 3, SP.fast); G.fr.to(R0, 3, SP.fast);
+  G.tw.to(R0, 18, SP.fast); G.th.to(R0, 18, SP.fast); G.tr.to(R0, 9, SP.fast); G.inset.to(R0, 0, SP.fast);
+  G.trk.to(R0, LINE, SP.fast); G.fill.to(R0, INK, SP.fast); G.thumb.to(R0, INK, SP.fast);
+  cover.x.to(R0, -162, SP.fast); cover.s.to(R0, 64, SP.fast); cover.r.to(R0, 18, SP.fast);
+  // b19 toggle: the leading edge of the knob runs ahead of the trailing one
+  press(B(19), 'toggle'); release(B(19) + 0.12, null);
+  knob.r.to(B(19), KNOB_ON[1], SP.lead); knob.l.to(B(19), KNOB_ON[0], SP.trail);
+  swTrack.to(B(19), BLUE, SP.fast); L_subA.hide(B(19)); L_subB.show(B(19) + 0.09);
+
+  // bar 6
+  state(B(20), ICON1); L_sw.hide(B(20)); knob.s.to(B(20), 0, SP.fast); knob.vis.to(B(20) + 0.04, 0, SP.out); // b20 knob -> icon
+  rowIcons[0].size.to(B(20), 60, SP.shape); rowIcons[0].vis.to(B(20) + 0.06, 1, SP.in);
+  go(B(20) + 0.05, 266, 116, SP.soft); sfx(B(20), 'pop');
+  state(B(21), ROW); rowIcons[0].size.to(B(21), 44); sfx(B(21), 'pop');                                        // b21 row
+  rowIcons.slice(1).forEach((ic, i) => { const d = 0.035 * (i + 1); ic.x.to(B(21) + d, ROWX[i + 1], SP.shape); ic.vis.to(B(21) + d, 1, SP.in); });
+  state(B(22), CHART); L_ch.show(B(22) + 0.1); L_subW.show(B(22) + 0.1); L_xW.show(B(22) + 0.12); sfx(B(22), 'expand'); // b22 chart
+  rowIcons.forEach(ic => { ic.vis.to(B(22), 0, SP.out); });
+  const R1 = B(22) + 0.4;
+  rowIcons.forEach((ic, i) => { ic.x.to(R1, IC, SP.fast); ic.size.to(R1, 44, SP.fast); });
+  knob.l.to(R1, KNOB_OFF[0], SP.fast); knob.r.to(R1, KNOB_OFF[1], SP.fast); knob.s.to(R1, 1, SP.fast);
+  swTrack.to(R1, '#E2DED8', SP.fast); L_subB.hide(B(22));
+  bars.forEach((b, i) => b.h.to(B(22) + 0.12 + 0.03 * i, WEEK[i], SP.bar));
+  go(B(23) - ARRIVE, 258, -176);
+  // b23 Month: indicator's right edge leads, left edge trails
+  press(B(23), 'tap'); release(B(23) + 0.12, null);
+  ind.r.to(B(23), 298, SP.lead); ind.l.to(B(23), 210, SP.trail);
+  tabWc.to(B(23), MUTED, SP.fast); tabMc.to(B(23), INK, SP.fast);
+  L_subW.hide(B(23)); L_subM.show(B(23) + 0.09); L_xW.hide(B(23)); L_xM.show(B(23) + 0.09);
+  bars.forEach((b, i) => b.h.to(B(23) + 0.03 * i, MONTH[i], SP.bar));
+
+  // bar 7: hover the chart
+  const top = (i, arr) => BASE - arr[i];
+  tip.x.to(B(23) + 0.25, BAR_X(3), SP.fast); tip.y.to(B(23) + 0.25, top(3, MONTH) - 38, SP.fast); tip.w.to(B(23) + 0.25, tipTexts[0].w, SP.fast);
+  go(B(24) - ARRIVE, BAR_X(3) + 8, top(3, MONTH) + 60);
+  tip.vis.to(B(24), 1, SP.in); tipTexts[0].L.show(B(24)); sfx(B(24), 'hover');                              // b24 tooltip
+  bars.forEach((b, i) => b.c.to(B(24), i === 3 ? CORAL : DIM, SP.fast));
+  go(B(25) - 0.3, BAR_X(5) + 8, top(5, MONTH) + 60, SP.fast);
+  tip.x.to(B(25), BAR_X(5), SP.soft); tip.y.to(B(25), top(5, MONTH) - 38, SP.soft); tip.w.to(B(25), tipTexts[1].w, SP.soft); // b25 follow
+  tipTexts[0].L.hide(B(25)); tipTexts[1].L.show(B(25) + 0.08); sfx(B(25), 'hover');
+  bars.forEach((b, i) => b.c.to(B(25), i === 5 ? CORAL : DIM, SP.fast));
+  go(B(26) - 0.34, 170, -176, SP.fast);
+  tip.vis.to(B(26) - 0.12, 0, SP.out); tipTexts[1].L.hide(B(26));                                           // b26 back to Week
+  bars.forEach(b => b.c.to(B(26) - 0.12, INK, SP.soft));
+  press(B(26), 'tap'); release(B(26) + 0.12, null);
+  ind.l.to(B(26), 122, SP.lead); ind.r.to(B(26), 210, SP.trail);
+  tabWc.to(B(26), INK, SP.fast); tabMc.to(B(26), MUTED, SP.fast);
+  L_subM.hide(B(26)); L_subW.show(B(26) + 0.09); L_xM.hide(B(26)); L_xW.show(B(26) + 0.09);
+  bars.forEach((b, i) => b.h.to(B(26) + 0.03 * (6 - i), WEEK[i], SP.bar));
+  L_subW.hide(B(27));
+
+  // =========================================================================
+  // seek(t): the only place styles are written
+  // =========================================================================
+  const px = v => v.toFixed(3) + 'px';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const inHold = t => t >= HOLD[0] && t < HOLD[1];
+
+  seek = function (t0) {
+    const t = ((t0 % T) + T) % T;
+    // cursor in world space
+    const cwx = cur.x.at(t), cwy = cur.y.at(t);
+
+    // slider value: direct manipulation while held, else the playback clock
+    const gx0 = G.x0.at(t), gx1 = G.x1.at(t), inset = G.inset.at(t), W = gx1 - gx0;
+    let v, over = 0;
+    if (inHold(t)) {
+      const raw = (cwx - gx0 + inset) / W;
+      v = clamp(raw); over = Math.max(0, raw - 1) * W;
+    } else if (t >= HOLD[1]) {
+      v = clamp((cur.x.at(HOLD[1]) - G.x0.at(HOLD[1]) + G.inset.at(HOLD[1])) / (G.x1.at(HOLD[1]) - G.x0.at(HOLD[1])));
+    } else v = vPlay(t);
+    const rubber = 26 * (1 - Math.exp(-over / 70));
+
+    // shape
+    const w = shape.w.at(t) + rubber, h = shape.h.at(t), cx = shape.cx.at(t) + rubber / 2, cy = shape.cy.at(t);
+    const r = Math.max(0, Math.min(shape.r.at(t), w / 2, h / 2));
+    const ss = shapeEl.style;
+    ss.left = px(cx - w / 2); ss.top = px(cy - h / 2); ss.width = px(w); ss.height = px(h);
+    ss.borderRadius = px(r); ss.background = shape.col.at(t);
+    ss.boxShadow = '0 1px 2px rgba(30,25,20,.06),0 22px 44px -18px rgba(30,25,20,.26)';
+    inner.style.transform = `translate(${px(-(cx - w / 2))},${px(-(cy - h / 2))})`;
+
+    // camera
+    const z = Math.exp(cam.lz.at(t)), kx = cam.x.at(t), ky = cam.y.at(t);
+    world.style.transform = `translate(720px,720px) scale(${z.toFixed(5)}) translate(${px(-kx)},${px(-ky)})`;
+
+    for (const L of layers) L.apply(t);
+
+    // loader
+    if (L_load.vis.at(t) > 0.002) {
+      const C = 2 * Math.PI * 9.2, p = clamp(loadP.at(t), 0, 1);
+      arc.setAttribute('stroke-dasharray', `${(p * C).toFixed(3)} ${C.toFixed(3)}`);
+      arc.setAttribute('transform', `rotate(${(-90 + (t - B(2)) * 400).toFixed(2)} 12 12)`);
+    }
+    checkP.style.transform = `translate(${px(checkX.at(t))},0)`;
+    checkPath.setAttribute('stroke-dashoffset', (1 - clamp(checkDraw.at(t), 0, 1)).toFixed(4));
+
+    // cover
+    const cv = clamp(cover.vis.at(t));
+    if (cv > 0.002) {
+      const s = cover.s.at(t), x = cover.x.at(t), cs = coverEl.style;
+      cs.display = ''; cs.left = px(x - s / 2); cs.top = px(-s / 2); cs.width = px(s); cs.height = px(s);
+      cs.borderRadius = px(cover.r.at(t)); cs.opacity = cv.toFixed(4);
+      cs.filter = cv > 0.995 ? 'none' : `blur(${((1 - cv) * 10).toFixed(2)}px)`;
+      disc.style.transform = `rotate(${(played(t) * 48).toFixed(2)}deg)`;
+    } else coverEl.style.display = 'none';
+
+    // island waveform
+    let lastBeat = 0; for (const b of BEATS) if (b <= t) lastBeat = b;
+    const pulse = Math.exp(-(t - lastBeat) / 0.16);
+    waves.forEach((e, i) => {
+      const a = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI * 1.9 + i * 1.7);
+      const hh = 6 + 18 * a * (0.45 + 0.55 * pulse);
+      e.style.height = px(hh); e.style.top = px(-hh / 2);
+    });
+
+    // play button
+    playBtn.style.transform = `translate(${PBX}px,${PBY}px) scale(${playBtnS.at(t).toFixed(4)})`;
+    tNow.textContent = fmt(v * 222);
+
+    // progress / volume
+    const gv = clamp(G.vis.at(t));
+    for (const e of [trkEl, fillEl, thumbEl]) e.style.display = gv > 0.002 ? '' : 'none';
+    if (gv > 0.002) {
+      const gy = G.y.at(t), gh = G.h.at(t), op = gv.toFixed(4);
+      const flt = gv > 0.995 ? 'none' : `blur(${((1 - gv) * 10).toFixed(2)}px)`;
+      Object.assign(trkEl.style, { left: px(gx0), top: px(gy - gh / 2), width: px(W + rubber), height: px(gh), borderRadius: px(G.r.at(t)), background: G.trk.at(t), opacity: op, filter: flt });
+      const fw = v * W + rubber;
+      Object.assign(fillEl.style, { left: px(gx0), top: px(gy - gh / 2), width: px(Math.max(0, fw)), height: px(gh), borderRadius: px(G.fr.at(t)), background: G.fill.at(t), opacity: op, filter: flt });
+      const tw = G.tw.at(t), th = G.th.at(t), tx = gx0 + fw - inset;
+      Object.assign(thumbEl.style, { left: px(tx - tw / 2), top: px(gy - th / 2), width: px(tw), height: px(th), borderRadius: px(G.tr.at(t)), background: G.thumb.at(t), opacity: op, filter: flt });
+    }
+    volTxt.textContent = Math.round(v * 100) + '%';
+    w1.style.opacity = smooth(0.04, 0.2, v).toFixed(3);
+    w2.style.opacity = smooth(0.66, 0.84, v).toFixed(3);
+
+    // switch
+    swTrackEl.style.background = swTrack.at(t);
+    const kv = clamp(knob.vis.at(t));
+    if (kv > 0.002) {
+      const l = knob.l.at(t), rr = knob.r.at(t), ks = Math.max(0, knob.s.at(t)), kc = (l + rr) / 2;
+      const kw = (rr - l) * ks, kh = 48 * ks;
+      Object.assign(knobEl.style, { display: '', left: px(kc - kw / 2), top: px(-kh / 2), width: px(kw), height: px(kh), borderRadius: px(kh / 2), opacity: kv.toFixed(4) });
+    } else knobEl.style.display = 'none';
+
+    // status icons
+    rowIcons.forEach(ic => {
+      const vv = clamp(ic.vis.at(t)), s = ic.el.style;
+      if (vv < 0.002) { s.display = 'none'; return; }
+      const k = ic.size.at(t) / 48 * (0.8 + 0.2 * vv);
+      s.display = ''; s.opacity = vv.toFixed(4);
+      s.filter = vv > 0.995 ? 'none' : `blur(${((1 - vv) * 8).toFixed(2)}px)`;
+      s.transform = `translate(${px(ic.x.at(t))},0) scale(${k.toFixed(4)})`;
+    });
+
+    // chart
+    if (L_ch.vis.at(t) > 0.002) {
+      const il = ind.l.at(t), ir = ind.r.at(t);
+      indEl.style.left = px(il); indEl.style.width = px(Math.max(36, ir - il));
+      tabW.style.color = tabWc.at(t); tabM.style.color = tabMc.at(t);
+      bars.forEach(b => {
+        const hh = Math.max(0, b.h.at(t)), s = b.el.style;
+        s.height = px(hh); s.top = px(BASE - hh); s.background = b.c.at(t);
+        s.borderRadius = px(Math.min(14, hh / 2));
+      });
+      const tv = clamp(tip.vis.at(t));
+      if (tv > 0.002) {
+        const tw = tip.w.at(t), ts = tipEl.style;
+        ts.display = ''; ts.left = px(tip.x.at(t) - tw / 2); ts.top = px(tip.y.at(t) - 22); ts.width = px(tw);
+        ts.opacity = tv.toFixed(4);
+        ts.filter = tv > 0.995 ? 'none' : `blur(${((1 - tv) * 8).toFixed(2)}px)`;
+        ts.transform = `scale(${(0.9 + 0.1 * tv).toFixed(4)})`;
+        ts.transformOrigin = '50% 100%';
+        tipTexts.forEach(x => { x.e.style.left = px(tw / 2); });
+      } else tipEl.style.display = 'none';
+    }
+
+    // cursor (screen space, hotspot at the arrow tip)
+    const sx = 720 + (cwx - kx) * z, sy = 720 + (cwy - ky) * z;
+    const pk = 1 - 0.14 * clamp(cur.p.at(t), -0.2, 1.2);
+    cursorEl.style.transform = `translate(${px(sx - 60 * 5.2 / 24 * pk)},${px(sy - 60 * 2.8 / 24 * pk)}) scale(${pk.toFixed(4)})`;
+  };
+
+  window.SFX = SFX.sort((a, b) => a.t - b.t);
+  window.T = T;
+  window.BEATS = BEATS;
+  seek(0);
+  window.READY = true;
+}
+window.seekT = t => seek(t);
+build().then(() => {
+  if (!location.search.includes('play')) return;
+  // preview only: drive seek() from the audio clock
+  const a = new Audio('out/loop.wav'); a.loop = true;
+  const t0 = performance.now();
+  document.addEventListener('click', () => a.play());
+  const tick = () => { seek(a.paused ? (performance.now() - t0) / 1000 : a.currentTime); requestAnimationFrame(tick); };
+  tick();
+});
+</script>
+</body>
+</html>
