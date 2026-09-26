@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" width="960" height="480" font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','WenQuanYi Zen Hei',sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c5cd6"/></marker>
+    <marker id="ahg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#a09cb0"/></marker>
+  </defs>
+  <rect width="960" height="480" fill="#faf8ff"/>
+  <text x="480" y="36" text-anchor="middle" font-size="18" font-weight="bold" fill="#2b2b33">双向链接：你只写一个方向，Obsidian 自动补上另一个方向</text>
+
+  <!-- A 日记 -->
+  <rect x="40" y="64" width="290" height="140" rx="10" fill="#fff" stroke="#d6d3e0"/>
+  <path d="M40 74a10 10 0 0 1 10-10h270a10 10 0 0 1 10 10v26h-290z" fill="#e8f6ee"/>
+  <text x="56" y="89" font-size="15" font-weight="bold" fill="#1f7a4a">2026-09-26（日记）</text>
+  <text x="56" y="132" font-size="15" fill="#2b2b33">今天试了 <tspan fill="#7c5cd6" font-weight="bold">[[番茄工作法]]</tspan>，</text>
+  <text x="56" y="158" font-size="15" fill="#2b2b33">25 分钟专注真的有用。</text>
+
+  <!-- C 时间管理 -->
+  <rect x="40" y="250" width="290" height="160" rx="10" fill="#fff" stroke="#d6d3e0"/>
+  <path d="M40 260a10 10 0 0 1 10-10h270a10 10 0 0 1 10 10v26h-290z" fill="#f1eefa"/>
+  <text x="56" y="275" font-size="15" font-weight="bold" fill="#4a3a8c">时间管理</text>
+  <text x="56" y="318" font-size="15" fill="#2b2b33">常用方法：</text>
+  <text x="56" y="346" font-size="15" fill="#2b2b33">• <tspan fill="#7c5cd6" font-weight="bold">[[番茄工作法]]</tspan></text>
+  <text x="56" y="374" font-size="15" fill="#2b2b33">• <tspan fill="#a09cb0" font-weight="bold">[[四象限法则]]</tspan></text>
+
+  <!-- 箭头 -->
+  <path d="M232 127 C 380 110, 440 110, 552 128" fill="none" stroke="#7c5cd6" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="400" y="104" text-anchor="middle" font-size="13" fill="#5b3fc4">你写的链接</text>
+  <path d="M190 341 C 380 330, 440 250, 552 190" fill="none" stroke="#7c5cd6" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="440" y="300" text-anchor="middle" font-size="13" fill="#5b3fc4">你写的链接</text>
+  <path d="M190 369 C 290 372, 330 400, 386 410" fill="none" stroke="#a09cb0" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ahg)"/>
+
+  <!-- D 未创建 -->
+  <rect x="390" y="376" width="150" height="80" rx="10" fill="#fbfaff" stroke="#b9b4c9" stroke-dasharray="6 4"/>
+  <text x="465" y="404" text-anchor="middle" font-size="14" font-weight="bold" fill="#8a85a0">四象限法则</text>
+  <text x="465" y="425" text-anchor="middle" font-size="12" fill="#8a85a0">（还不存在）</text>
+  <text x="465" y="443" text-anchor="middle" font-size="12" fill="#8a85a0">点一下链接就会新建</text>
+
+  <!-- B 番茄工作法 -->
+  <rect x="560" y="64" width="360" height="380" rx="10" fill="#fff" stroke="#7c5cd6" stroke-width="2"/>
+  <path d="M561 74a9 9 0 0 1 9-9h340a9 9 0 0 1 9 9v26h-358z" fill="#ede7ff"/>
+  <text x="578" y="89" font-size="15" font-weight="bold" fill="#4a3a8c">番茄工作法</text>
+  <text x="578" y="132" font-size="15" fill="#2b2b33">专注 25 分钟，休息 5 分钟；</text>
+  <text x="578" y="158" font-size="15" fill="#2b2b33">每完成 4 轮，长休息一次。</text>
+  <line x1="578" y1="196" x2="902" y2="196" stroke="#e5e2ee"/>
+
+  <text x="578" y="226" font-size="14" font-weight="bold" fill="#7c5cd6">反向链接 · 2</text>
+  <rect x="770" y="211" width="132" height="22" rx="11" fill="#fef3c7"/>
+  <text x="836" y="227" text-anchor="middle" font-size="12" fill="#92400e">自动生成，无需手写</text>
+
+  <rect x="578" y="244" width="324" height="56" rx="6" fill="#f7f5fd"/>
+  <text x="592" y="266" font-size="13" font-weight="bold" fill="#2b2b33">2026-09-26</text>
+  <text x="592" y="288" font-size="12" fill="#6b6780">今天试了 <tspan fill="#7c5cd6" font-weight="bold">番茄工作法</tspan>，25 分钟专注真的有用。</text>
+  <rect x="578" y="310" width="324" height="56" rx="6" fill="#f7f5fd"/>
+  <text x="592" y="332" font-size="13" font-weight="bold" fill="#2b2b33">时间管理</text>
+  <text x="592" y="354" font-size="12" fill="#6b6780">• <tspan fill="#7c5cd6" font-weight="bold">番茄工作法</tspan></text>
+  <text x="578" y="396" font-size="12" fill="#8a85a0">别的笔记一提到它，这里就自动列出来，</text>
+  <text x="578" y="416" font-size="12" fill="#8a85a0">点击即可跳回原文。</text>
+</svg>

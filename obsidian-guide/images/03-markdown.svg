@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 530" width="960" height="530" font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','WenQuanYi Zen Hei',sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c5cd6"/></marker>
+  </defs>
+  <rect width="960" height="530" fill="#faf8ff"/>
+
+  <text x="240" y="44" text-anchor="middle" font-size="17" font-weight="bold" fill="#2b2b33">你输入的（Markdown 源码）</text>
+  <text x="720" y="44" text-anchor="middle" font-size="17" font-weight="bold" fill="#2b2b33">看到的效果</text>
+
+  <rect x="30" y="66" width="420" height="412" rx="10" fill="#fff" stroke="#d6d3e0"/>
+  <rect x="510" y="66" width="420" height="412" rx="10" fill="#fff" stroke="#d6d3e0"/>
+
+  <line x1="458" y1="272" x2="502" y2="272" stroke="#7c5cd6" stroke-width="3" marker-end="url(#ah)"/>
+
+  <!-- 左：源码 -->
+  <g font-family="Consolas,'SFMono-Regular',Menlo,'WenQuanYi Zen Hei Mono',monospace" font-size="15" fill="#2b2b33">
+    <text x="56" y="106"><tspan fill="#9d7cf0">#</tspan> 一级标题</text>
+    <text x="56" y="140"><tspan fill="#9d7cf0">##</tspan> 二级标题</text>
+    <text x="56" y="174"><tspan fill="#9d7cf0">**</tspan>加粗<tspan fill="#9d7cf0">**</tspan> 和 <tspan fill="#9d7cf0">*</tspan>斜体<tspan fill="#9d7cf0">*</tspan></text>
+    <text x="56" y="208"><tspan fill="#9d7cf0">~~</tspan>删除线<tspan fill="#9d7cf0">~~</tspan>  <tspan fill="#9d7cf0">==</tspan>高亮<tspan fill="#9d7cf0">==</tspan></text>
+    <text x="56" y="242"><tspan fill="#9d7cf0">-</tspan> 无序列表</text>
+    <text x="56" y="276"><tspan fill="#9d7cf0">1.</tspan> 有序列表</text>
+    <text x="56" y="310"><tspan fill="#9d7cf0">- [ ]</tspan> 待办  <tspan fill="#9d7cf0">- [x]</tspan> 完成</text>
+    <text x="56" y="344"><tspan fill="#9d7cf0">&gt;</tspan> 引用的文字</text>
+    <text x="56" y="378"><tspan fill="#9d7cf0">`</tspan>代码<tspan fill="#9d7cf0">`</tspan></text>
+    <text x="56" y="412"><tspan fill="#9d7cf0">[[</tspan>另一篇笔记<tspan fill="#9d7cf0">]]</tspan>  <tspan fill="#9d7cf0">#</tspan>标签</text>
+    <text x="56" y="446"><tspan fill="#9d7cf0">[</tspan>网站<tspan fill="#9d7cf0">](https://obsidian.md)</tspan></text>
+  </g>
+
+  <!-- 右：渲染效果 -->
+  <g fill="#2b2b33">
+    <text x="536" y="109" font-size="24" font-weight="bold">一级标题</text>
+    <text x="536" y="142" font-size="19" font-weight="bold">二级标题</text>
+    <text x="536" y="176" font-size="15"><tspan font-weight="bold">加粗</tspan> 和 <tspan font-style="italic">斜体</tspan></text>
+    <text x="536" y="210" font-size="15" fill="#8a8f98">删除线</text>
+    <line x1="535" y1="205" x2="583" y2="205" stroke="#8a8f98" stroke-width="1.4"/>
+    <rect x="600" y="193" width="36" height="22" rx="3" fill="#fde68a"/>
+    <text x="603" y="210" font-size="15">高亮</text>
+    <circle cx="542" cy="239" r="3" fill="#2b2b33"/>
+    <text x="556" y="244" font-size="15">无序列表</text>
+    <text x="536" y="278" font-size="15">1.  有序列表</text>
+    <rect x="536.5" y="298.5" width="13" height="13" rx="3" fill="none" stroke="#8a8f98"/>
+    <text x="558" y="311" font-size="15">待办</text>
+    <rect x="606" y="298" width="14" height="14" rx="3" fill="#8b6cf0"/><path d="M609 305l3 3 5-6" fill="none" stroke="#fff" stroke-width="1.8"/>
+    <text x="628" y="311" font-size="15" fill="#8a8f98">完成</text>
+    <line x1="627" y1="306" x2="659" y2="306" stroke="#8a8f98" stroke-width="1.4"/>
+    <rect x="536" y="327" width="3" height="24" fill="#8b6cf0"/>
+    <text x="550" y="345" font-size="15" fill="#6b6780">引用的文字</text>
+    <rect x="536" y="362" width="44" height="23" rx="4" fill="#f0eef6"/>
+    <text x="543" y="379" font-size="14" fill="#c2255c">代码</text>
+    <text x="536" y="413" font-size="15" fill="#7c5cd6">另一篇笔记</text>
+    <rect x="626" y="397" width="50" height="22" rx="11" fill="#ede7ff"/>
+    <text x="635" y="413" font-size="13" fill="#6d4fd6">#标签</text>
+    <text x="536" y="447" font-size="15" fill="#2563eb">网站 ↗</text>
+    <line x1="536" y1="451" x2="566" y2="451" stroke="#2563eb" stroke-width="1"/>
+  </g>
+
+  <text x="480" y="510" text-anchor="middle" font-size="14" fill="#6b6780">默认的「实时预览」模式：光标离开这一行，符号会自动隐藏，只留下效果；光标移回来又能看到符号。</text>
+</svg>

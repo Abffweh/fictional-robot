@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="960" height="560" font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','WenQuanYi Zen Hei',sans-serif">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#a88bfa" stop-opacity=".55"/><stop offset="1" stop-color="#a88bfa" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="960" height="560" fill="#f4f1fb"/>
+  <rect x="20" y="16" width="920" height="528" rx="12" fill="#1e1e1e"/>
+  <text x="44" y="52" font-size="16" font-weight="bold" fill="#dcddde">关系图谱</text>
+  <g fill="none" stroke="#8a8a8a" stroke-width="1.5">
+    <circle cx="876" cy="46" r="7"/><path d="M876 39v-3M876 56v-3M869 46h-3M886 46h-3"/>
+    <path d="M900 40h14M900 46h14M900 52h14"/>
+  </g>
+
+  <!-- 普通连线 -->
+  <g stroke="#4a4a4a" stroke-width="1.3">
+    <line x1="340" y1="190" x2="220" y2="140"/>
+    <line x1="340" y1="190" x2="300" y2="330"/>
+    <line x1="340" y1="190" x2="180" y2="260"/>
+    <line x1="600" y1="170" x2="640" y2="330"/>
+    <line x1="600" y1="170" x2="760" y2="220"/>
+    <line x1="760" y1="220" x2="840" y2="300"/>
+    <line x1="760" y1="220" x2="780" y2="420"/>
+    <line x1="640" y1="330" x2="780" y2="420"/>
+    <line x1="180" y1="260" x2="130" y2="380"/>
+    <line x1="130" y1="380" x2="90" y2="445"/>
+    <line x1="130" y1="380" x2="220" y2="455"/>
+    <line x1="500" y1="410" x2="130" y2="380"/>
+  </g>
+  <!-- 选中节点的连线 -->
+  <g stroke="#a88bfa" stroke-width="2.2">
+    <line x1="480" y1="260" x2="340" y2="190"/>
+    <line x1="480" y1="260" x2="600" y2="170"/>
+    <line x1="480" y1="260" x2="640" y2="330"/>
+    <line x1="480" y1="260" x2="500" y2="410"/>
+    <line x1="480" y1="260" x2="380" y2="390"/>
+  </g>
+
+  <!-- 节点 -->
+  <circle cx="480" cy="260" r="40" fill="url(#glow)"/>
+  <circle cx="480" cy="260" r="15" fill="#a88bfa"/>
+  <circle cx="340" cy="190" r="12" fill="#c8c8d4"/>
+  <circle cx="600" cy="170" r="10" fill="#c8c8d4"/>
+  <circle cx="640" cy="330" r="10" fill="#f0a050"/>
+  <circle cx="780" cy="420" r="9" fill="#f0a050"/>
+  <circle cx="300" cy="330" r="7" fill="#5fbf7f"/>
+  <circle cx="380" cy="390" r="7" fill="#5fbf7f"/>
+  <circle cx="500" cy="410" r="8" fill="#5fbf7f"/>
+  <circle cx="220" cy="140" r="7" fill="none" stroke="#8a8a8a" stroke-width="1.6" stroke-dasharray="3 2"/>
+  <circle cx="760" cy="220" r="9" fill="#c8c8d4"/>
+  <circle cx="840" cy="300" r="6" fill="#c8c8d4"/>
+  <circle cx="180" cy="260" r="8" fill="#c8c8d4"/>
+  <circle cx="130" cy="380" r="10" fill="#c8c8d4"/>
+  <circle cx="90" cy="445" r="6" fill="#c8c8d4"/>
+  <circle cx="220" cy="455" r="6" fill="#c8c8d4"/>
+  <circle cx="880" cy="140" r="5" fill="#c8c8d4"/>
+  <circle cx="870" cy="460" r="5" fill="#c8c8d4"/>
+
+  <!-- 标签 -->
+  <g font-size="12" text-anchor="middle" stroke="#1e1e1e" stroke-width="4" stroke-linejoin="round" paint-order="stroke">
+    <text x="480" y="294" font-size="14" font-weight="bold" fill="#fff">番茄工作法</text>
+    <text x="340" y="216" fill="#e8e8e8">时间管理</text>
+    <text x="600" y="195" fill="#e8e8e8">专注</text>
+    <text x="640" y="355" fill="#e8e8e8">《深度工作》读书笔记</text>
+    <text x="300" y="352" fill="#e8e8e8">2026-09-24</text>
+    <text x="380" y="412" fill="#e8e8e8">2026-09-25</text>
+    <text x="500" y="433" fill="#e8e8e8">2026-09-26</text>
+    <text x="220" y="162" fill="#8a8a8a">四象限法则</text>
+    <text x="760" y="244" fill="#9a9a9a">习惯养成</text>
+    <text x="840" y="321" fill="#9a9a9a">睡眠</text>
+    <text x="780" y="444" fill="#9a9a9a">《原子习惯》读书笔记</text>
+    <text x="180" y="283" fill="#9a9a9a">学习计划</text>
+    <text x="130" y="405" fill="#9a9a9a">Obsidian 入门</text>
+    <text x="90" y="466" fill="#9a9a9a">双向链接</text>
+    <text x="220" y="476" fill="#9a9a9a">Markdown 语法</text>
+    <text x="880" y="160" fill="#9a9a9a">灵感碎片</text>
+    <text x="870" y="480" fill="#9a9a9a">随手记</text>
+  </g>
+
+  <!-- 图例 -->
+  <g font-size="12" fill="#bdbdbd">
+    <circle cx="48" cy="518" r="6" fill="#a88bfa"/><text x="60" y="522">鼠标悬停的笔记及其链接</text>
+    <circle cx="232" cy="518" r="6" fill="#5fbf7f"/><text x="244" y="522">日记（按路径分组上色）</text>
+    <circle cx="416" cy="518" r="6" fill="#f0a050"/><text x="428" y="522">读书笔记</text>
+    <circle cx="512" cy="518" r="6" fill="none" stroke="#8a8a8a" stroke-width="1.6" stroke-dasharray="3 2"/><text x="524" y="522">未创建的笔记</text>
+    <text x="630" y="522">节点越大 = 链接越多 · 右侧两个孤点 = 孤立笔记</text>
+  </g>
+</svg>

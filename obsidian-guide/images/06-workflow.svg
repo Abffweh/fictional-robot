@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','WenQuanYi Zen Hei',sans-serif">
+  <defs>
+    <symbol id="folder" viewBox="0 0 18 14"><path d="M1 2.5a1.5 1.5 0 0 1 1.5-1.5h4l2 2h7a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5h-13a1.5 1.5 0 0 1-1.5-1.5z" fill="#f2b84b"/></symbol>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c5cd6"/></marker>
+  </defs>
+  <rect width="960" height="400" fill="#faf8ff"/>
+
+  <!-- 左：文件夹结构 -->
+  <text x="210" y="40" text-anchor="middle" font-size="17" font-weight="bold" fill="#2b2b33">推荐的文件夹结构</text>
+  <rect x="30" y="58" width="360" height="310" rx="10" fill="#fff" stroke="#d6d3e0"/>
+  <g font-size="15">
+    <use href="#folder" x="50" y="84" width="20" height="16"/><text x="80" y="98" font-weight="bold" fill="#2b2b33">00 收件箱</text><text x="185" y="98" font-size="13" fill="#6b6780">随手记，先丢进来</text>
+    <use href="#folder" x="50" y="130" width="20" height="16"/><text x="80" y="144" font-weight="bold" fill="#2b2b33">10 日记</text><text x="185" y="144" font-size="13" fill="#6b6780">每天一篇日记</text>
+    <use href="#folder" x="50" y="176" width="20" height="16"/><text x="80" y="190" font-weight="bold" fill="#2b2b33">20 项目</text><text x="185" y="190" font-size="13" fill="#6b6780">有目标、有截止日期</text>
+    <use href="#folder" x="50" y="222" width="20" height="16"/><text x="80" y="236" font-weight="bold" fill="#2b2b33">30 知识</text><text x="185" y="236" font-size="13" fill="#6b6780">长期积累的笔记</text>
+    <use href="#folder" x="50" y="268" width="20" height="16"/><text x="80" y="282" font-weight="bold" fill="#2b2b33">90 模板</text><text x="185" y="282" font-size="13" fill="#6b6780">日记、读书笔记模板</text>
+    <use href="#folder" x="50" y="314" width="20" height="16"/><text x="80" y="328" font-weight="bold" fill="#2b2b33">99 附件</text><text x="185" y="328" font-size="13" fill="#6b6780">图片、PDF 等</text>
+  </g>
+
+  <!-- 右：循环 -->
+  <text x="685" y="40" text-anchor="middle" font-size="17" font-weight="bold" fill="#2b2b33">新手友好的笔记循环</text>
+  <g font-size="13" fill="#4b4760">
+    <rect x="440" y="62" width="210" height="120" rx="12" fill="#e8f6ee" stroke="#9ed8b6"/>
+    <circle cx="466" cy="90" r="13" fill="#1f7a4a"/><text x="466" y="95" text-anchor="middle" font-weight="bold" fill="#fff">1</text>
+    <text x="488" y="96" font-size="17" font-weight="bold" fill="#1f7a4a">捕捉</text>
+    <text x="458" y="132">在日记或收件箱随手记</text>
+    <text x="458" y="156">先记下来，不求完美</text>
+
+    <rect x="700" y="62" width="210" height="120" rx="12" fill="#fef3c7" stroke="#f6cf6b"/>
+    <circle cx="726" cy="90" r="13" fill="#a16207"/><text x="726" y="95" text-anchor="middle" font-weight="bold" fill="#fff">2</text>
+    <text x="748" y="96" font-size="17" font-weight="bold" fill="#a16207">整理</text>
+    <text x="718" y="132">每周清空一次收件箱</text>
+    <text x="718" y="156">改标题、加标签、归位</text>
+
+    <rect x="700" y="232" width="210" height="120" rx="12" fill="#ede7ff" stroke="#c4b5fd"/>
+    <circle cx="726" cy="260" r="13" fill="#6d4fd6"/><text x="726" y="265" text-anchor="middle" font-weight="bold" fill="#fff">3</text>
+    <text x="748" y="266" font-size="17" font-weight="bold" fill="#6d4fd6">连接</text>
+    <text x="718" y="302">用 [[ ]] 连到相关笔记</text>
+    <text x="718" y="326">常看反向链接找关联</text>
+
+    <rect x="440" y="232" width="210" height="120" rx="12" fill="#e0f2fe" stroke="#93c5fd"/>
+    <circle cx="466" cy="260" r="13" fill="#1d4ed8"/><text x="466" y="265" text-anchor="middle" font-weight="bold" fill="#fff">4</text>
+    <text x="488" y="266" font-size="17" font-weight="bold" fill="#1d4ed8">输出</text>
+    <text x="458" y="302">写文章、做项目、复盘</text>
+    <text x="458" y="326">新想法再回到第 1 步</text>
+  </g>
+  <g stroke="#7c5cd6" stroke-width="2.5" fill="none" marker-end="url(#ah)">
+    <line x1="654" y1="122" x2="694" y2="122"/>
+    <line x1="805" y1="186" x2="805" y2="226"/>
+    <line x1="696" y1="292" x2="656" y2="292"/>
+    <line x1="545" y1="228" x2="545" y2="188"/>
+  </g>
+</svg>
