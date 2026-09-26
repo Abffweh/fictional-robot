@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metamorphosis — The Life of a Monarch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #D5CAAD; }
+  body { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #plate {
+    position: relative;
+    width: min(96vw, 96vh); height: min(96vw, 96vh);
+    box-shadow: 0 1px 2px rgba(58,49,37,.16), 0 14px 44px rgba(58,49,37,.16);
+  }
+  #plate svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* static paper layers get their own compositing layers so their filters rasterize once */
+  #bg, #fx { will-change: transform; }
+  #fx { pointer-events: none; mix-blend-mode: multiply; }
+  text { font-family: 'Alegreya', 'EB Garamond', Georgia, serif; }
+  .ui { cursor: pointer; }
+  #scrub { opacity: .16; transition: opacity .45s ease; cursor: pointer; }
+  #scrub:hover, #scrub.drag { opacity: .85; }
+  #menu .mi { opacity: .72; transition: opacity .25s; }
+  #menu .mi:hover { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="plate">
+
+<!-- ================= STATIC PAPER (rendered once) ================= -->
+<svg id="bg" viewBox="0 0 1000 1000" aria-hidden="true">
+  <defs>
+    <filter id="fMottle" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0035" numOctaves="3" seed="3"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .83  0 0 0 0 .78  0 0 0 0 .66  1.4 0 0 0 -.55"/>
+    </filter>
+    <filter id="fCloud" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0042 0.0058" numOctaves="4" seed="11"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .73  0 0 0 0 .67  0 0 0 0 .52  2.1 0 0 0 -.86"/>
+    </filter>
+    <filter id="fCloudLight" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency="0.005 0.0045" numOctaves="4" seed="29"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .94  0 0 0 0 .91  0 0 0 0 .84  2.3 0 0 0 -1.02"/>
+    </filter>
+  </defs>
+  <rect width="1000" height="1000" fill="#E7DEC6"/>
+  <rect width="1000" height="1000" fill="#000" filter="url(#fMottle)" opacity=".5"/>
+  <rect x="48" y="48" width="904" height="832" fill="#DDD3B8"/>
+  <rect x="48" y="48" width="904" height="832" fill="#000" filter="url(#fCloud)" opacity=".55"/>
+  <rect x="48" y="48" width="904" height="832" fill="#000" filter="url(#fCloudLight)" opacity=".6"/>
+</svg>
+
+<!-- ================= ANIMATED PLATE ================= -->
+<svg id="main" viewBox="0 0 1000 1000" role="img" aria-label="Metamorphosis — the life of a monarch butterfly, animated as a natural-history plate">
+  <defs id="defs">
+    <clipPath id="frameClip"><rect x="48.5" y="48.5" width="903" height="831"/></clipPath>
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="3.4" height="3.4" patternTransform="rotate(38)">
+      <rect width=".62" height="3.4" fill="#2F281E"/></pattern>
+    <pattern id="hatchFine" patternUnits="userSpaceOnUse" width="2.4" height="2.4" patternTransform="rotate(-32)">
+      <rect width=".45" height="2.4" fill="#2F281E"/></pattern>
+    <pattern id="hatchDense" patternUnits="userSpaceOnUse" width="2.3" height="2.3" patternTransform="rotate(24)">
+      <rect width=".8" height="2.3" fill="#2F281E"/></pattern>
+    <radialGradient id="gShadow">
+      <stop offset="0" stop-color="#2F281E" stop-opacity=".34"/>
+      <stop offset=".55" stop-color="#2F281E" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#2F281E" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gLeaf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B2B37B" stop-opacity=".0"/>
+      <stop offset=".55" stop-color="#8B8C57" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#8B8C57" stop-opacity=".55"/>
+    </linearGradient>
+    <linearGradient id="gShadeSide" x1="0" y1="0" x2="1" y2="0">
+      <stop offset=".35" stop-color="#000"/><stop offset=".9" stop-color="#fff"/>
+    </linearGradient>
+    <mask id="shadeSideMask" maskUnits="userSpaceOnUse" x="-100" y="300" width="1300" height="800">
+      <rect x="-100" y="300" width="1300" height="800" fill="url(#gShadeSide)"/>
+    </mask>
+    <linearGradient id="gChrys" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8E9E7E"/>
+      <stop offset=".42" stop-color="#C4C7AB"/>
+      <stop offset=".7" stop-color="#B1B898"/>
+      <stop offset="1" stop-color="#95A383"/>
+    </linearGradient>
+    <linearGradient id="gTwig" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A09267"/><stop offset=".45" stop-color="#8A7D55"/><stop offset="1" stop-color="#6A5E3E"/>
+    </linearGradient>
+    <mask id="biteMask" maskUnits="userSpaceOnUse" x="-200" y="200" width="1500" height="900">
+      <rect x="-200" y="200" width="1500" height="900" fill="#fff"/>
+      <g id="biteHoles" fill="#000"></g>
+    </mask>
+    <mask id="eggMask" maskUnits="userSpaceOnUse" x="-40" y="-90" width="80" height="110">
+      <rect x="-40" y="-90" width="80" height="110" fill="#fff"/>
+      <path id="eggCut" fill="#000" d="M0 0"/>
+      <path id="eggHole" fill="#000" d="M0 0"/>
+    </mask>
+    <mask id="shellMask" maskUnits="userSpaceOnUse" x="-120" y="-40" width="240" height="340">
+      <rect x="-120" y="-40" width="240" height="340" fill="#fff"/>
+      <path id="shellCut" fill="#000" fill-opacity="0" d="M0 0"/>
+    </mask>
+    <path id="pupaShape" d="M0 0"/>
+    <clipPath id="chrysClip"><use href="#pupaShape"/></clipPath>
+    <!-- hidden guide geometry sampled with getPointAtLength -->
+    <path id="leafEdgeGuide" d="M-60 790 C 60 640, 290 505, 480 503 C 690 501, 900 590, 1040 735 C 1075 772, 1100 810, 1130 860"/>
+    <path id="twigGuide" d="M-140 160 C 200 104, 720 106, 1140 226"/>
+    <path id="exitGuide" d="M0 0"/>
+    <path id="twigUnderGuide" d="M0 0"/>
+  </defs>
+
+  <g clip-path="url(#frameClip)">
+    <rect id="dayLight" x="48" y="48" width="904" height="832" fill="#F4EFDF" opacity="0"/>
+    <rect id="dayDark" x="48" y="48" width="904" height="832" fill="#5B5033" opacity="0"/>
+
+    <g id="cam">
+      <g id="leafScene" display="none">
+        <g id="dome" mask="url(#biteMask)"></g>
+        <g id="eggShadowG"></g>
+        <g id="eggG"></g>
+        <g id="husks"></g>
+        <path id="trail" fill="none" stroke="#3A3125" stroke-width="1" stroke-dasharray="1.2 3.4" stroke-linecap="round" opacity="0" d="M0 0"/>
+        <g id="larvaLayer"></g>
+        <use id="eggFront" href="#eggG" display="none"/>
+        <g id="scaleBar" opacity="0">
+          <line id="sbLine" y1="0" y2="0" stroke="#3A3125" stroke-width=".7" stroke-dasharray="3 2.2"/>
+          <line id="sbT1" y1="-3" y2="3" stroke="#3A3125" stroke-width=".7"/>
+          <line id="sbT2" y1="-3" y2="3" stroke="#3A3125" stroke-width=".7"/>
+          <text id="sbText" y="14" text-anchor="middle" font-size="11" font-style="italic" fill="#3A3125" fill-opacity=".85">2 mm</text>
+        </g>
+        <g id="fgLeaf"></g>
+      </g>
+
+      <g id="twigScene" display="none">
+        <g id="twigG"></g>
+        <g id="padG"></g>
+        <g id="bflyG"></g>
+        <g id="pupaG"></g>
+        <g id="hangLayer"></g>
+      </g>
+
+      <g id="callouts"></g>
+    </g>
+
+    <g id="titleCard" opacity="0" fill="#3A3125">
+      <text x="500" y="442" text-anchor="middle" font-size="46" font-style="italic" fill-opacity=".88">Danaus plexippus</text>
+      <line id="titleRule" x1="410" y1="466" x2="590" y2="466" stroke="#3A3125" stroke-width=".7" stroke-dasharray="180 180" stroke-dashoffset="180"/>
+      <text x="500" y="498" text-anchor="middle" font-size="18" font-style="italic" fill-opacity=".78">the monarch, from egg to imago</text>
+    </g>
+  </g>
+
+  <!-- ================= FOOTER / HUD ================= -->
+  <g id="footer" fill="#3A3125" fill-opacity=".85">
+    <g id="chapBtn" class="ui">
+      <rect x="44" y="903" width="240" height="32" fill="transparent"/>
+      <text id="numB" x="52" y="925" font-size="13.5"></text>
+      <text id="titB" x="96" y="925" font-size="15" font-style="italic"></text>
+      <text id="numA" x="52" y="925" font-size="13.5"></text>
+      <text id="titA" x="96" y="925" font-size="15" font-style="italic"></text>
+    </g>
+    <g id="dayG">
+      <circle cx="471" cy="920" r="9" fill="none" stroke="#3A3125" stroke-opacity=".22" stroke-width="1.2"/>
+      <circle id="ring" cx="471" cy="920" r="9" fill="none" stroke="#3A3125" stroke-opacity=".85" stroke-width="1.2"
+              stroke-dasharray="56.55 56.55" stroke-dashoffset="56.55" transform="rotate(-90 471 920)"/>
+      <text id="dayT" x="487" y="925" font-size="15" font-style="italic">day 0</text>
+    </g>
+    <text x="948" y="925" text-anchor="end" font-size="15" font-style="italic">Life cycle shown in time-lapse.</text>
+    <text id="pausedT" x="500" y="944" text-anchor="middle" font-size="11.5" font-style="italic" opacity="0">paused</text>
+  </g>
+
+  <g id="scrub">
+    <rect x="40" y="949" width="920" height="24" fill="transparent"/>
+    <line x1="48" y1="960" x2="952" y2="960" stroke="#3A3125" stroke-width=".5"/>
+    <g id="scrubTicks" stroke="#3A3125" stroke-width=".6"></g>
+    <line id="scrubFill" x1="48" y1="960" x2="48" y2="960" stroke="#3A3125" stroke-width="1.3"/>
+    <circle id="scrubKnob" cx="48" cy="960" r="2.6" fill="#3A3125"/>
+  </g>
+
+  <g id="menu" display="none">
+    <rect x="44" y="733" width="214" height="168" fill="#EFE8D4" stroke="#3A3125" stroke-width=".6" stroke-opacity=".7"/>
+    <g id="menuItems" fill="#3A3125"></g>
+  </g>
+</svg>
+
+<!-- ================= STATIC OVERLAY: grain, vignette, rules ================= -->
+<svg id="fx" viewBox="0 0 1000 1000" aria-hidden="true">
+  <defs>
+    <filter id="fGrain" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency=".82" numOctaves="2" seed="4"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .23  0 0 0 0 .19  0 0 0 0 .14  3.2 0 0 0 -1.72"/>
+    </filter>
+    <filter id="fFleck" x="0" y="0" width="1" height="1">
+      <feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="3" seed="17"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .55  0 0 0 0 .45  0 0 0 0 .3  7 0 0 0 -4.9"/>
+    </filter>
+    <radialGradient id="gVig" cx=".5" cy=".5" r=".72">
+      <stop offset=".62" stop-color="#5B5033" stop-opacity="0"/>
+      <stop offset="1" stop-color="#5B5033" stop-opacity=".2"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1000" fill="#000" filter="url(#fGrain)" opacity=".42"/>
+  <rect width="1000" height="1000" fill="#000" filter="url(#fFleck)" opacity=".13"/>
+  <rect width="1000" height="1000" fill="url(#gVig)"/>
+  <rect x="16" y="16" width="968" height="968" fill="none" stroke="#6E5F46" stroke-width="1" stroke-opacity=".75"/>
+  <rect x="20" y="20" width="960" height="960" fill="none" stroke="#6E5F46" stroke-width=".5" stroke-opacity=".65"/>
+  <rect x="48" y="48" width="904" height="832" fill="none" stroke="#3A3125" stroke-width="1"/>
+  <rect x="51.5" y="51.5" width="897" height="825" fill="none" stroke="#3A3125" stroke-width=".4" stroke-opacity=".45"/>
+</svg>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   0. SETUP — palette, constants, DOM helpers
+   ===================================================================== */
+const NS = 'http://www.w3.org/2000/svg';
+const $ = id => document.getElementById(id);
+const svg = $('main'), defs = $('defs');
+
+const PAL = {
+  paper: '#E7DEC6', paperLight: '#EFE8D4', paperShadow: '#D3C7A8',
+  ink: '#3A3125', outline: '#2F281E',
+  leaf: '#A4A56C', leafShade: '#8B8C57', vein: '#E4DEC2',
+  twig: '#8A7D55', twigShadow: '#5B5033',
+  egg: '#E9E0C4', eggRib: '#B6AA86',
+  catYellow: '#D6B45A', catBlack: '#2A2520', catWhite: '#ECE5D0',
+  sage: '#B9BCA0', jade: '#9FB08E', gold: '#C9A24A',
+  orange: '#C0652A', deepOrange: '#9A4A1E', wingBlack: '#221D18', spot: '#F1EBDC'
+};
+const TOTAL = 80;                       // seconds per loop
+const FC = { x: 500, y: 464 };          // centre of the picture frame
+const NSEG = 11;                        // caterpillar body segments
+const WAVE = 0.42;                      // peristaltic wave width (fraction of body)
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+/* write an attribute only when its value actually changed */
+function setA(e, k, v) { const c = '_' + k; if (e[c] !== v) { e[c] = v; e.setAttribute(k, v); } }
+function show(e, on) { setA(e, 'display', on ? 'inline' : 'none'); }
+
+/* =====================================================================
+   1. HELPERS — math, easing, colour, paths
+   ===================================================================== */
+const clamp = (x, a = 0, b = 1) => x < a ? a : x > b ? b : x;
+const lerp = (a, b, k) => a + (b - a) * k;
+const smoothstep = (e0, e1, x) => { const k = clamp((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); };
+const easeInOutSine = k => -(Math.cos(Math.PI * clamp(k)) - 1) / 2;
+const easeInOutCubic = k => { k = clamp(k); return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const F = v => Math.round(v * 100) / 100;
+const DEG = 180 / Math.PI;
+const hash = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const angLerp = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * k; };
+const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+
+function hexRGB(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function mixHex(a, b, k) {
+  const A = hexRGB(a), B = hexRGB(b);
+  return 'rgb(' + Math.round(lerp(A[0], B[0], k)) + ',' + Math.round(lerp(A[1], B[1], k)) + ',' + Math.round(lerp(A[2], B[2], k)) + ')';
+}
+
+/* Catmull-Rom → cubic Bézier, closed and open */
+function smoothClosed(P) {
+  const n = P.length; let d = 'M' + F(P[0][0]) + ' ' + F(P[0][1]);
+  for (let i = 0; i < n; i++) {
+    const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+    d += 'C' + F(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + F(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+         F(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + F(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + F(p2[0]) + ' ' + F(p2[1]);
+  }
+  return d + 'Z';
+}
+function smoothOpen(P) {
+  const n = P.length; let d = 'M' + F(P[0][0]) + ' ' + F(P[0][1]);
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(n - 1, i + 2)];
+    d += 'C' + F(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + F(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+         F(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + F(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + F(p2[0]) + ' ' + F(p2[1]);
+  }
+  return d;
+}
+function polyline(P, close) {
+  let d = 'M' + F(P[0][0]) + ' ' + F(P[0][1]);
+  for (let i = 1; i < P.length; i++) d += 'L' + F(P[i][0]) + ' ' + F(P[i][1]);
+  return close ? d + 'Z' : d;
+}
+function circlePath(x, y, r) {
+  return 'M' + F(x - r) + ' ' + F(y) + 'a' + r + ' ' + r + ' 0 1 0 ' + (2 * r) + ' 0a' + r + ' ' + r + ' 0 1 0 ' + (-2 * r) + ' 0Z';
+}
+
+/* Path interpolation: two paths with identical command structure are split into
+   string/number templates once, then blended number-by-number every frame. */
+function pathTemplate(d) {
+  const parts = d.split(/(-?\d+(?:\.\d+)?)/);
+  const strs = [], nums = [];
+  for (let i = 0; i < parts.length; i++) (i % 2 ? nums : strs).push(i % 2 ? +parts[i] : parts[i]);
+  return { strs, nums };
+}
+function pathLerp(A, B, k) {
+  let s = A.strs[0];
+  for (let i = 0; i < A.nums.length; i++) s += F(lerp(A.nums[i], B.nums[i], k)) + A.strs[i + 1];
+  return s;
+}
+
+/* Arc-length lookup tables sampled once from guide paths with getPointAtLength */
+function makeLUT(pathEl, step) {
+  const len = pathEl.getTotalLength(), n = Math.max(8, Math.ceil(len / step));
+  const X = new Float64Array(n + 1), Y = new Float64Array(n + 1), A = new Float64Array(n + 1);
+  for (let i = 0; i <= n; i++) { const p = pathEl.getPointAtLength(len * i / n); X[i] = p.x; Y[i] = p.y; }
+  for (let i = 0; i <= n; i++) {
+    const a = Math.max(0, i - 2), b = Math.min(n, i + 2);
+    A[i] = Math.atan2(Y[b] - Y[a], X[b] - X[a]);
+    if (i) { while (A[i] - A[i - 1] > Math.PI) A[i] -= 2 * Math.PI; while (A[i] - A[i - 1] < -Math.PI) A[i] += 2 * Math.PI; }
+  }
+  return { len, n, ds: len / n, X, Y, A };
+}
+function lutAt(L, s) {
+  if (s <= 0) { const a = L.A[0]; return { x: L.X[0] + Math.cos(a) * s, y: L.Y[0] + Math.sin(a) * s, a }; }
+  if (s >= L.len) { const a = L.A[L.n], e = s - L.len; return { x: L.X[L.n] + Math.cos(a) * e, y: L.Y[L.n] + Math.sin(a) * e, a }; }
+  const f = s / L.ds, i = Math.min(L.n - 1, Math.floor(f)), k = f - i;
+  return { x: lerp(L.X[i], L.X[i + 1], k), y: lerp(L.Y[i], L.Y[i + 1], k), a: lerp(L.A[i], L.A[i + 1], k) };
+}
+function sAtX(L, x, descending) {
+  for (let i = 0; i <= L.n; i++) if (descending ? L.X[i] <= x : L.X[i] >= x) return i * L.ds;
+  return L.len;
+}
+/* outward normal of a surface tangent a is (sin a, −cos a) */
+const offsetPt = (p, h) => ({ x: p.x + Math.sin(p.a) * h, y: p.y - Math.cos(p.a) * h, a: p.a });
+
+/* =====================================================================
+   2. TIMELINE — chapter data, day counter
+   ===================================================================== */
+const CHAPTERS = [
+  { id: 'egg', numeral: 'I', title: 'The egg', start: 4, end: 14, dayStart: 0, dayEnd: 4,
+    dayKeys: [[4, 0], [10, 3], [11.2, 4], [14, 4]] },
+  { id: 'caterpillar', numeral: 'II', title: 'The caterpillar', start: 14, end: 36, dayStart: 4, dayEnd: 16 },
+  { id: 'j', numeral: 'III', title: 'The J', start: 36, end: 44, dayStart: 16, dayEnd: 17,
+    dayKeys: [[36, 16], [42, 16.9], [44, 17]] },
+  { id: 'chrysalis', numeral: 'IV', title: 'The chrysalis', start: 44, end: 58, dayStart: 17, dayEnd: 27,
+    dayKeys: [[44, 17], [50, 17.95], [56, 25], [58, 27]] },
+  { id: 'eclosion', numeral: 'V', title: 'Eclosion', start: 58, end: 70, dayStart: 27, dayEnd: 27 },
+  { id: 'imago', numeral: 'VI', title: 'The imago', start: 70, end: 80, dayStart: 28, dayEnd: 28 }
+];
+function chapterIndex(t) { let c = -1; for (let i = 0; i < CHAPTERS.length; i++) if (t >= CHAPTERS[i].start) c = i; return c; }
+function dayAt(t) {
+  const c = chapterIndex(t); if (c < 0) return 0;
+  const C = CHAPTERS[c];
+  if (C.dayKeys) {
+    const K = C.dayKeys;
+    for (let i = 0; i < K.length - 1; i++) if (t <= K[i + 1][0]) return lerp(K[i][1], K[i + 1][1], seg(t, K[i][0], K[i + 1][0]));
+    return K[K.length - 1][1];
+  }
+  return lerp(C.dayStart, C.dayEnd, seg(t, C.start, C.end));
+}
+
+/* per-frame shared state (anchors for callouts etc.), rebuilt purely from t */
+const S = {};
+
+/* =====================================================================
+   3. SCENE GEOMETRY — leaf, egg, twig (built once)
+   ===================================================================== */
+const leafLUT = makeLUT($('leafEdgeGuide'), 1.5);
+const twigLUT = makeLUT($('twigGuide'), 2);
+
+/* ---- milkweed leaf (background dome) ---- */
+const domeG = $('dome');
+const DOME_D = $('leafEdgeGuide').getAttribute('d') + ' L1130 1100 L-60 1100 Z';
+el('clipPath', { id: 'domeClip' }, defs).appendChild(el('path', { d: DOME_D }));
+el('path', { d: DOME_D, fill: PAL.leaf }, domeG);
+el('path', { d: DOME_D, fill: 'url(#gLeaf)' }, domeG);
+(function buildLeaf() {
+  const inner = el('g', { 'clip-path': 'url(#domeClip)' }, domeG);
+  // engraved shading band along the shaded (right) rim
+  S.leafHatch = el('path', { d: $('leafEdgeGuide').getAttribute('d'), fill: 'none', stroke: 'url(#hatch)',
+    'stroke-width': 90, mask: 'url(#shadeSideMask)', opacity: .3 }, inner);
+  el('path', { d: 'M-60 1000 L1130 1000 L1130 860 C 900 900, 400 880, -60 930 Z', fill: 'url(#hatch)', opacity: .16 }, inner);
+  const veins = el('g', { fill: 'none', stroke: PAL.vein, 'stroke-linecap': 'round' }, inner);
+  // rim vein running parallel to the edge
+  const rim = [], rim2 = [];
+  for (let s = 0; s <= leafLUT.len; s += 8) { const p = lutAt(leafLUT, s); rim.push([p.x - Math.sin(p.a) * 18, p.y + Math.cos(p.a) * 18]); rim2.push([p.x - Math.sin(p.a) * 4.5, p.y + Math.cos(p.a) * 4.5]); }
+  el('path', { d: smoothOpen(rim), 'stroke-width': 1.25, opacity: .85 }, veins);
+  el('path', { d: smoothOpen(rim2), 'stroke-width': .8, opacity: .4 }, veins);
+  // evenly spaced curved lateral veins sweeping up from the (hidden) midrib
+  const s0 = sAtX(leafLUT, 20), s1 = sAtX(leafLUT, 1010);
+  let k = 0;
+  for (let s = s0; s < s1; s += 62, k++) {
+    const p = lutAt(leafLUT, s), nx = Math.sin(p.a), ny = -Math.cos(p.a);
+    const ex = p.x - nx * 18, ey = p.y - ny * 18;
+    const sx = ex - 210 + hash(k) * 20, sy = 1010;
+    el('path', { d: `M${F(sx)} ${sy} C${F(sx + 40)} ${F(ey + 230)} ${F(ex - nx * 90 - 24)} ${F(ey - ny * 90)} ${F(ex)} ${F(ey)}`,
+      'stroke-width': 1.6, opacity: .82 }, veins);
+    // small veinlet between laterals near the rim
+    const q = lutAt(leafLUT, s + 31), qx = q.x - Math.sin(q.a) * 18, qy = q.y + Math.cos(q.a) * 18;
+    el('path', { d: `M${F(qx)} ${F(qy)} q${F(-Math.sin(q.a) * 14 - 8)} ${F(Math.cos(q.a) * 14 + 6)} ${F(-Math.sin(q.a) * 26 - 16)} ${F(Math.cos(q.a) * 30 + 6)}`,
+      'stroke-width': .8, opacity: .5 }, veins);
+  }
+  S.notchRims = el('g', { fill: 'none', stroke: '#5E5B37', 'stroke-width': 2 }, inner);
+  el('path', { d: $('leafEdgeGuide').getAttribute('d'), fill: 'none', stroke: '#5E5B37', 'stroke-width': 1.3 }, domeG);
+})();
+
+/* ---- foreground leaf (dense hatching, pale rim) ---- */
+(function buildForeground() {
+  const g = $('fgLeaf');
+  const top = 'M-60 826 C 250 806, 640 818, 1060 876';
+  const body = top + ' L1060 1100 L-60 1100 Z';
+  el('path', { d: body, fill: PAL.leafShade }, g);
+  el('path', { d: body, fill: 'url(#hatchDense)', opacity: .42 }, g);
+  el('path', { d: top, fill: 'none', stroke: PAL.outline, 'stroke-width': 1.1 }, g);
+  el('path', { d: top, fill: 'none', stroke: PAL.vein, 'stroke-width': 3.2, transform: 'translate(0 3)' }, g);
+  el('path', { d: top, fill: 'none', stroke: PAL.outline, 'stroke-width': .6, opacity: .6, transform: 'translate(0 5.4)' }, g);
+  const v = el('g', { stroke: PAL.vein, 'stroke-width': .9, opacity: .55, fill: 'none' }, g);
+  for (let x = 30; x < 1000; x += 64) {
+    const y = 826 - 20 * Math.sin((x + 60) / 1120 * Math.PI) + (x > 640 ? (x - 640) * 0.13 : 0);
+    el('path', { d: `M${x} ${F(y + 8)} q-14 30 -46 70`, 'stroke-width': 1.1 }, v);
+  }
+})();
+
+/* ---- egg (static placement on the leaf crest) ---- */
+const EGG_H = 46;
+function eggHW(u) { return 15 * (u < .4 ? .72 + .28 * Math.sin(u / .4 * Math.PI / 2) : 1 - .62 * Math.pow((u - .4) / .6, 1.6)); }
+const EGG_S = sAtX(leafLUT, 190);
+const EB = lutAt(leafLUT, EGG_S);
+function eggToWorld(lx, ly) { const r = rot(lx, ly, EB.a); return [EB.x + r[0], EB.y + r[1]]; }
+const EGG = {};
+(function buildEgg() {
+  const g = $('eggG');
+  g.setAttribute('transform', `translate(${F(EB.x)} ${F(EB.y)}) rotate(${F(EB.a * DEG)})`);
+  const pts = [];
+  for (let u = 0; u <= 1.0001; u += .08) pts.push([eggHW(u), -EGG_H * u]);
+  pts.push([0, -EGG_H - .6]);
+  for (let u = 1; u >= -0.0001; u -= .08) pts.push([-eggHW(u), -EGG_H * u]);
+  pts.push([0, 1.2]);
+  const outline = smoothClosed(pts);
+  el('clipPath', { id: 'eggClip' }, defs).appendChild(el('path', { d: outline }));
+  const sh = $('eggShadowG');
+  const sp = eggToWorld(4, 3);
+  el('ellipse', { cx: F(sp[0]), cy: F(sp[1]), rx: 25, ry: 7, fill: 'url(#gShadow)', transform: `rotate(${F(EB.a * DEG)} ${F(sp[0])} ${F(sp[1])})` }, sh);
+  const m = el('g', { mask: 'url(#eggMask)' }, g);
+  EGG.body = el('path', { d: outline, fill: PAL.egg }, m);
+  const cl = el('g', { 'clip-path': 'url(#eggClip)' }, m);
+  for (let u = .12; u < .92; u += .065) {
+    const w = eggHW(u) * .96;
+    el('path', { d: `M${F(-w)} ${F(-EGG_H * u)} Q0 ${F(-EGG_H * u + 1.1)} ${F(w)} ${F(-EGG_H * u)}`, fill: 'none', stroke: PAL.eggRib, 'stroke-width': .35, opacity: .55 }, cl);
+  }
+  for (let k = 0; k < 10; k++) {
+    const th = (-81 + 18 * k) / DEG, rib = [];
+    for (let u = .03; u <= .975; u += .06) rib.push([eggHW(u) * Math.sin(th), -EGG_H * u]);
+    el('path', { d: smoothOpen(rib), fill: 'none', stroke: PAL.eggRib, 'stroke-width': .75 }, cl);
+  }
+  el('rect', { x: 4, y: -52, width: 16, height: 56, fill: 'url(#hatchFine)', opacity: .38 }, cl);
+  el('path', { d: `M-8.5 -7 Q-11.5 -19 -10 -31`, fill: 'none', stroke: PAL.paperLight, 'stroke-width': 1.3, opacity: .6 }, cl);
+  EGG.dark = el('ellipse', { cx: 0, cy: F(-EGG_H * .86), rx: 6.4, ry: 5.4, fill: PAL.catBlack, opacity: 0 }, cl);
+  EGG.inner = el('ellipse', { cx: 0, cy: 0, rx: 0, ry: 2.4, fill: PAL.eggRib, opacity: 0 }, cl);
+  el('path', { d: outline, fill: 'none', stroke: PAL.outline, 'stroke-width': 1 }, m);
+  EGG.rim = el('path', { d: 'M0 0', fill: 'none', stroke: PAL.outline, 'stroke-width': .8, 'clip-path': 'url(#eggClip)', opacity: 0 }, g);
+  EGG.jag = [];
+  for (let i = 0; i <= 10; i++) EGG.jag.push((hash(i + 40) - .5) * 2);
+})();
+
+/* ---- exit path the hatchling follows: up through the shell, over the tip, down its side ---- */
+const EXIT = {};
+(function buildExit() {
+  const pts = [eggToWorld(-2, -9), eggToWorld(-3, -20), eggToWorld(-2, -31), eggToWorld(1, -34), eggToWorld(3.5, -29), eggToWorld(3.5, -18),
+    eggToWorld(2, -9), eggToWorld(-1, -10), eggToWorld(0, -EGG_H * .6), eggToWorld(0, -EGG_H + 3), eggToWorld(2.5, -EGG_H - 1.5),
+    eggToWorld(eggHW(.95) + 1.5, -EGG_H * .93)];
+  for (const u of [.82, .68, .54, .4, .26, .12]) pts.push(eggToWorld(eggHW(u) + .6, -EGG_H * u));
+  EXIT.joinS = EGG_S + eggHW(0) + 7;
+  const j = lutAt(leafLUT, EXIT.joinS);
+  pts.push(eggToWorld(eggHW(0) + 2.5, -1.2));
+  pts.push([j.x, j.y]);
+  $('exitGuide').setAttribute('d', smoothOpen(pts));
+  EXIT.lut = makeLUT($('exitGuide'), .75);
+  EXIT.joinA = EXIT.lut.len;
+  EXIT.tipA = (function () { // arc length where the path passes the top of the egg
+    let best = 0, by = 1e9; for (let i = 0; i <= EXIT.lut.n; i++) {
+      const [lx, ly] = rot(EXIT.lut.X[i] - EB.x, EXIT.lut.Y[i] - EB.y, -EB.a); if (ly < by) { by = ly; best = i; } }
+    return best * EXIT.lut.ds; })();
+})();
+const exitSurf = s => s < EXIT.joinA ? lutAt(EXIT.lut, s) : lutAt(leafLUT, EXIT.joinS + s - EXIT.joinA);
+const leafSurf = s => lutAt(leafLUT, s);
+
+/* ---- twig spanning the top of the frame ---- */
+const TWIG = {};
+(function buildTwig() {
+  const g = $('twigG');
+  const wAt = x => lerp(8.2, 5.4, clamp((x + 140) / 1280));
+  const top = [], bot = [], mid = [];
+  for (let s = 0; s <= twigLUT.len; s += 10) {
+    const p = lutAt(twigLUT, s), w = wAt(p.x), nx = Math.sin(p.a), ny = -Math.cos(p.a);
+    top.push([p.x + nx * w, p.y + ny * w]); bot.push([p.x - nx * w, p.y - ny * w]); mid.push([p.x - nx * w * .1, p.y - ny * w * .1]);
+  }
+  const body = smoothOpen(top) + 'L' + smoothOpen(bot.slice().reverse()).slice(1) + 'Z';
+  el('path', { d: body, fill: 'url(#gTwig)' }, g);
+  const lower = smoothOpen(mid) + 'L' + smoothOpen(bot.slice().reverse()).slice(1) + 'Z';
+  el('path', { d: lower, fill: PAL.twigShadow, opacity: .38 }, g);
+  el('path', { d: lower, fill: 'url(#hatchFine)', opacity: .5 }, g);
+  el('path', { d: smoothOpen(top.map(([x, y]) => [x, y + 2.2])), fill: 'none', stroke: PAL.paperLight, 'stroke-width': .9, opacity: .35 }, g);
+  el('path', { d: body, fill: 'none', stroke: PAL.outline, 'stroke-width': .95 }, g);
+  const bark = el('g', { stroke: PAL.twigShadow, 'stroke-width': .6, opacity: .7, fill: 'none' }, g);
+  for (let s = 60; s < twigLUT.len; s += 47 + 20 * hash(s)) {
+    const p = lutAt(twigLUT, s), w = wAt(p.x) * .5;
+    el('path', { d: `M${F(p.x)} ${F(p.y - w)} q${F(4 + 6 * hash(s + 1))} ${F(w * .6)} ${F(10 + 8 * hash(s + 2))} ${F(w * .3)}` }, bark);
+  }
+  // underside guide, running right → left (the caterpillar walks leftwards beneath it)
+  const under = [];
+  for (let x = 1130; x >= -130; x -= 8) {
+    const p = lutAt(twigLUT, sAtX(twigLUT, x)), w = wAt(p.x);
+    under.push([p.x - Math.sin(p.a) * w, p.y + Math.cos(p.a) * w]);
+  }
+  $('twigUnderGuide').setAttribute('d', smoothOpen(under));
+  TWIG.lut = makeLUT($('twigUnderGuide'), 1.5);
+  TWIG.sP = sAtX(TWIG.lut, 480, true);
+  TWIG.P = lutAt(TWIG.lut, TWIG.sP);
+  TWIG.aP = TWIG.P.a; while (TWIG.aP < 0) TWIG.aP += 2 * Math.PI; while (TWIG.aP > 2 * Math.PI) TWIG.aP -= 2 * Math.PI;
+})();
+const twigSurf = s => lutAt(TWIG.lut, s);
+const PX = TWIG.P.x, PY = TWIG.P.y;
+
+/* =====================================================================
+   4. CATERPILLAR RIG — procedural body along a spine
+   ===================================================================== */
+const lenPx = mm => 44 * Math.pow(mm, .55);                 // on-plate length for a body length in mm
+function radiusProfile(v) { return (.6 + .4 * smoothstep(0, .16, v)) * (1 - .14 * smoothstep(.84, 1, v)); }
+
+const PROLEG = 'M-0.2 0.62 L-0.17 1.16 Q0 1.3 0.17 1.16 L0.2 0.62Z';
+const TRUELEG = 'M-0.12 0.6 L0.12 1.06 L0.34 1.3 L0.2 1.03 L0.1 0.6Z';
+const ANALLEG = 'M-0.16 0.5 L-0.4 1.12 Q-0.2 1.26 0 1.14 L0.16 0.56Z';
+const LEGS = [{ i: 0, d: ANALLEG }, { i: 2, d: PROLEG }, { i: 3, d: PROLEG }, { i: 4, d: PROLEG }, { i: 5, d: PROLEG },
+  { i: 8, d: TRUELEG }, { i: 9, d: TRUELEG }, { i: 10, d: TRUELEG }];
+const INSTAR_LOOK = [
+  { base: '#DAD5C6', y: .2, b: .28, fF: 1.0, fR: .5 },
+  { base: '#E4DDC9', y: .66, b: .7, fF: 1.6, fR: .8 },
+  { base: PAL.catWhite, y: .88, b: .9, fF: 2.1, fR: 1.0 },
+  { base: PAL.catWhite, y: .96, b: .96, fF: 2.6, fR: 1.25 },
+  { base: PAL.catWhite, y: 1, b: 1, fF: 3.0, fR: 1.45 }
+];
+function instarLook(k) {
+  const i = clamp(Math.floor(k), 0, 4), j = Math.min(4, i + 1), f = clamp(k - i);
+  const A = INSTAR_LOOK[i], B = INSTAR_LOOK[j];
+  return { base: f < .001 ? A.base : mixHex(A.base, B.base, f), y: lerp(A.y, B.y, f), b: lerp(A.b, B.b, f), fF: lerp(A.fF, B.fF, f), fR: lerp(A.fR, B.fR, f) };
+}
+
+function makePose() {
+  const C = []; for (let j = 0; j <= NSEG; j++) C.push({ x: 0, y: 0, a: 0, r: 0 });
+  return { C, bump: new Float64Array(NSEG + 1), lagBump: new Float64Array(NSEG + 1), s: new Float64Array(NSEG + 1) };
+}
+
+/* body laid along a surface (leaf edge / twig underside), with a peristaltic wave */
+function surfacePose(P, surf, st) {
+  for (let j = 0; j <= NSEG; j++) {
+    const v = j / NSEG;
+    const local = st.sigma > 0 ? clamp((st.phi * (1 + WAVE) - v) / WAVE) : 0;
+    const lagL = st.sigma > 0 ? clamp(((st.phi - .1) * (1 + WAVE) - v) / WAVE) : 0;
+    const sm = local * local * (3 - 2 * local), bump = Math.sin(Math.PI * local);
+    const s = (st.anchor === 'tail' ? st.sRest + st.L * v : st.sRest - st.L * (1 - v)) + st.sigma * sm;
+    const p = surf(s), r = st.R * radiusProfile(v);
+    const lift = st.sigma * .28 * bump - (st.dip || 0) * smoothstep(.62, 1, v);
+    const h = r * 1.22 + lift, c = P.C[j];
+    c.x = p.x + Math.sin(p.a) * h; c.y = p.y - Math.cos(p.a) * h; c.r = r; c.a = p.a;
+    P.s[j] = s; P.bump[j] = bump; P.lagBump[j] = Math.sin(Math.PI * lagL);
+  }
+}
+/* body integrated from the tail along a heading function (hanging J, pre-pupa) */
+function curvePose(P, x0, y0, L, R, heading, rMul) {
+  let x = x0, y = y0; const sub = 4, dl = L / NSEG / sub;
+  for (let j = 0; j <= NSEG; j++) {
+    const c = P.C[j], v = j / NSEG;
+    c.x = x; c.y = y; c.r = R * radiusProfile(v) * (rMul ? rMul(v, j) : 1); c.a = heading(v);
+    P.bump[j] = 0; P.lagBump[j] = 0;
+    if (j < NSEG) for (let k = 0; k < sub; k++) { const a = heading((j + (k + .5) / sub) / NSEG); x += Math.cos(a) * dl; y += Math.sin(a) * dl; }
+  }
+}
+/* recompute segment angles from the actual centre line (after lifts/bends) */
+function fixAngles(P) {
+  const C = P.C;
+  for (let j = 0; j <= NSEG; j++) {
+    const a = C[Math.max(0, j - 1)], b = C[Math.min(NSEG, j + 1)];
+    C[j].a = Math.atan2(b.y - a.y, b.x - a.x);
+  }
+}
+/* curl the front of the body back over itself (hatchling turning to its shell) */
+function bendPose(P, v0, B) {
+  if (Math.abs(B) < 1e-3) return;
+  const C = P.C, lens = [], angs = [];
+  for (let j = 1; j <= NSEG; j++) { lens[j] = Math.hypot(C[j].x - C[j - 1].x, C[j].y - C[j - 1].y); angs[j] = Math.atan2(C[j].y - C[j - 1].y, C[j].x - C[j - 1].x); }
+  const j0 = Math.round(v0 * NSEG);
+  for (let j = j0 + 1; j <= NSEG; j++) {
+    const a = angs[j] + B * smoothstep(v0, 1, (j - .5) / NSEG);
+    C[j].x = C[j - 1].x + Math.cos(a) * lens[j]; C[j].y = C[j - 1].y + Math.sin(a) * lens[j];
+  }
+}
+
+function createRig(parent, id, withShadow) {
+  const R = { cache: {} };
+  R.g = el('g', {}, parent);
+  if (withShadow) R.shadow = el('ellipse', { fill: 'url(#gShadow)', rx: 0, ry: 0 }, R.g);
+  R.farLegs = el('g', { fill: PAL.catBlack, opacity: .5 }, R.g);
+  const cp = el('clipPath', { id: id + 'Clip' }, defs); R.clip = el('path', { d: 'M0 0' }, cp);
+  R.fill = el('path', { fill: PAL.catWhite }, R.g);
+  const bands = el('g', { 'clip-path': `url(#${id}Clip)` }, R.g);
+  R.yelG = el('g', { fill: PAL.catYellow }, bands); R.blkG = el('g', { fill: PAL.catBlack }, bands);
+  R.yel = []; R.blk = []; R.blk2 = [];
+  for (let i = 0; i < NSEG; i++) { R.yel.push(el('path', {}, R.yelG)); R.blk.push(el('path', {}, R.blkG)); R.blk2.push(el('path', {}, R.blkG)); }
+  R.belly = el('path', { fill: 'url(#hatchFine)', opacity: .55 }, bands);
+  R.dull = el('path', { fill: '#8E897B', opacity: 0 }, R.g);
+  R.outline = el('path', { fill: 'none', stroke: PAL.outline, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }, R.g);
+  R.nearLegs = el('g', { fill: PAL.catBlack }, R.g);
+  R.legs = LEGS.map(L => ({ i: L.i, far: el('path', { d: L.d }, R.farLegs), near: el('path', { d: L.d }, R.nearLegs) }));
+  R.fils = []; for (let i = 0; i < 4; i++) R.fils.push(el('path', { fill: 'none', stroke: PAL.catBlack, 'stroke-linecap': 'round' }, R.g));
+  R.head = el('g', {}, R.g);
+  el('ellipse', { cx: .28, cy: .08, rx: .72, ry: .8, fill: PAL.catBlack, stroke: PAL.outline, 'stroke-width': .06 }, R.head);
+  R.face = el('g', { fill: 'none', stroke: PAL.catWhite, 'stroke-width': .1, 'stroke-linecap': 'round' }, R.head);
+  el('path', { d: 'M-0.05 -0.62 Q0.55 -0.52 0.8 0.08' }, R.face);
+  el('path', { d: 'M-0.22 -0.28 Q0.35 -0.1 0.56 0.58' }, R.face);
+  el('path', { d: 'M0.1 -0.58 Q0.38 -0.66 0.6 -0.46', fill: 'none', stroke: PAL.paperLight, 'stroke-width': .07, opacity: .4 }, R.head);
+  el('path', { d: 'M0.78 0.42 L1.0 0.62 L0.74 0.7Z', fill: PAL.catBlack }, R.head);
+  return R;
+}
+
+function interpC(A, B, u) {
+  return { x: lerp(A.x, B.x, u), y: lerp(A.y, B.y, u), a: angLerp(A.a, B.a, u), r: lerp(A.r, B.r, u) };
+}
+function bandD(A, B, u0, u1) {
+  const p = interpC(A, B, u0), q = interpC(A, B, u1), e = 1.45;
+  const pn = [Math.sin(p.a) * p.r * e, -Math.cos(p.a) * p.r * e], qn = [Math.sin(q.a) * q.r * e, -Math.cos(q.a) * q.r * e];
+  return 'M' + F(p.x + pn[0]) + ' ' + F(p.y + pn[1]) + 'L' + F(q.x + qn[0]) + ' ' + F(q.y + qn[1]) +
+         'L' + F(q.x - qn[0]) + ' ' + F(q.y - qn[1]) + 'L' + F(p.x - pn[0]) + ' ' + F(p.y - pn[1]) + 'Z';
+}
+function filPath(x, y, ang, len, curve) {
+  const cx = x + Math.cos(ang) * len * .6, cy = y + Math.sin(ang) * len * .6;
+  const a2 = ang + curve;
+  return 'M' + F(x) + ' ' + F(y) + 'Q' + F(cx) + ' ' + F(cy) + ' ' + F(cx + Math.cos(a2) * len * .5) + ' ' + F(cy + Math.sin(a2) * len * .5);
+}
+
+/* draw a pose; look = colours, head pitch, filament state, etc. */
+function drawRig(R, P, look) {
+  const C = P.C, N = NSEG;
+  const T = [], B = [];
+  for (let j = 0; j <= N; j++) {
+    const c = C[j], nx = Math.sin(c.a) * c.r, ny = -Math.cos(c.a) * c.r;
+    T.push([c.x + nx, c.y + ny]); B.push([c.x - nx, c.y - ny]);
+  }
+  const c0 = C[0], cN = C[N];
+  const pts = [[c0.x - Math.cos(c0.a) * c0.r * .85, c0.y - Math.sin(c0.a) * c0.r * .85]].concat(T,
+    [[cN.x + Math.cos(cN.a) * cN.r * .6, cN.y + Math.sin(cN.a) * cN.r * .6]], B.slice().reverse());
+  const d = smoothClosed(pts);
+  R.fill.setAttribute('d', d); R.clip.setAttribute('d', d); R.outline.setAttribute('d', d); R.dull.setAttribute('d', d);
+  setA(R.fill, 'fill', look.base);
+  setA(R.yelG, 'opacity', F(look.y)); setA(R.blkG, 'opacity', F(look.b));
+  setA(R.dull, 'opacity', F(look.dull || 0));
+  const legOp = F(look.legOp == null ? 1 : look.legOp);
+  setA(R.nearLegs, 'opacity', legOp); setA(R.farLegs, 'opacity', F(.5 * legOp));
+  for (let i = 0; i < N; i++) {
+    const A = C[i], Bc = C[i + 1];
+    R.yel[i].setAttribute('d', bandD(A, Bc, .06, .4));
+    R.blk[i].setAttribute('d', bandD(A, Bc, .47, .74));
+    R.blk2[i].setAttribute('d', bandD(A, Bc, .86, .95));
+  }
+  const belly = [];
+  for (let j = 0; j <= N; j++) { const c = C[j]; belly.push([c.x - Math.sin(c.a) * c.r * .12, c.y + Math.cos(c.a) * c.r * .12]); }
+  R.belly.setAttribute('d', polyline(belly.concat(B.slice().reverse()), true));
+
+  // legs follow their segment transforms
+  for (const L of R.legs) {
+    const A = C[L.i], Bc = C[L.i + 1];
+    const mx = (A.x + Bc.x) / 2, my = (A.y + Bc.y) / 2, a = Math.atan2(Bc.y - A.y, Bc.x - A.x), r = (A.r + Bc.r) / 2;
+    const lift = 1 - .35 * Math.max(P.bump[L.i], P.bump[L.i + 1]);
+    const tr = `translate(${F(mx)} ${F(my)}) rotate(${F(a * DEG)}) scale(${F(r)} ${F(r * lift)})`;
+    L.near.setAttribute('transform', tr);
+    L.far.setAttribute('transform', tr + ' translate(0.22 -0.05)');
+  }
+  // filaments with lagging secondary motion
+  const pairs = [{ i: 9, f: true }, { i: 1, f: false }];
+  let fi = 0;
+  for (const pr of pairs) {
+    const A = C[pr.i], Bc = C[pr.i + 1], m = interpC(A, Bc, .5);
+    const lag = (P.lagBump[pr.i] + P.lagBump[pr.i + 1]) / 2;
+    for (let side = 0; side < 2; side++) {
+      const off = (side ? .2 : -.2) * m.r;
+      const rx = m.x + Math.cos(m.a) * off + Math.sin(m.a) * m.r * .8, ry = m.y + Math.sin(m.a) * off - Math.cos(m.a) * m.r * .8;
+      const sway = (look.sway || 0) * (side ? 1 : .8) + .07 * Math.sin((look.time || 0) * 2.1 + pr.i + side * 1.7) - .35 * lag;
+      let ang = m.a - Math.PI / 2 + (pr.f ? .42 : -.52) + sway, curve = pr.f ? .55 : -.45;
+      let len = m.r * (pr.f ? look.fF : look.fR) * (side ? 1 : .92);
+      const limp = look.limp || 0;
+      if (limp > 0) { ang = angLerp(ang, Math.PI / 2 + (pr.f ? .5 : -.5), limp * .8); curve = lerp(curve, pr.f ? 1.6 : -1.6, limp); len *= 1 - .4 * limp; }
+      len *= look.filScale == null ? 1 : look.filScale;
+      const p = R.fils[fi++];
+      p.setAttribute('d', filPath(rx, ry, ang, len, curve));
+      setA(p, 'stroke-width', F(Math.max(.7, m.r * .11)));
+      setA(p, 'stroke-opacity', side ? '0.95' : '0.7');
+    }
+  }
+  // head
+  const hx = cN.x + Math.cos(cN.a) * cN.r * .45 - Math.sin(cN.a) * cN.r * .12 + Math.cos(cN.a) * (look.headShift || 0);
+  const hy = cN.y + Math.sin(cN.a) * cN.r * .45 + Math.cos(cN.a) * cN.r * .12 + Math.sin(cN.a) * (look.headShift || 0);
+  const hr = cN.r * 1.05 / .86 * .9;
+  R.head.setAttribute('transform', `translate(${F(hx)} ${F(hy)}) rotate(${F((cN.a + (look.pitch || 0)) * DEG)}) scale(${F(hr)})`);
+  setA(R.head, 'opacity', F(look.headOp == null ? 1 : look.headOp));
+  setA(R.face, 'opacity', F(clamp(look.b * 1.1)));
+  R.headPt = { x: hx, y: hy, r: hr };
+  if (R.shadow) {
+    const sh = look.shadow;
+    if (sh) {
+      R.shadow.setAttribute('cx', F(sh.x)); R.shadow.setAttribute('cy', F(sh.y));
+      R.shadow.setAttribute('rx', F(sh.rx)); R.shadow.setAttribute('ry', F(sh.ry));
+      R.shadow.setAttribute('transform', `rotate(${F(sh.a * DEG)} ${F(sh.x)} ${F(sh.y)})`);
+    }
+    show(R.shadow, !!sh);
+  }
+}
+
+/* =====================================================================
+   5. CHAPTER I–II DATA — larva plan (crawl / feed / moult), bites, husks
+   ===================================================================== */
+const INSTARS = [
+  { name: 'first instar', mm: [2, 5] }, { name: 'second instar', mm: [7, 9] }, { name: 'third instar', mm: [11, 13] },
+  { name: 'fourth instar', mm: [16, 22] }, { name: 'fifth instar', mm: [27, 45] }
+];
+const LARVA_START = EXIT.joinS + lenPx(2) - 2;         // head s on the leaf once fully out of the egg
+const PLAN = [], BITES = [], HUSKS = [], INSTAR_WIN = [];
+(function buildPlan() {
+  const tOfDay = d => 14 + (d - 4) * 22 / 12;
+  const bounds = [4, 7, 9, 11, 13, 16].map(tOfDay);
+  const targets = [[300, 318], [405, 420], [515, 530], [630, 645], [728, 800]];
+  let h = LARVA_START, mm = 2;
+  const crawl = (t0, t1, anchor, sRest, d, L, k) =>
+    PLAN.push({ type: 'crawl', t0, t1, anchor, sRest, d, m: Math.max(1, Math.round(d / (.12 * L))), k, mm0: mm, mm1: mm });
+  for (let k = 0; k < 5; k++) {
+    const a = bounds[k], b = bounds[k + 1], I = INSTARS[k];
+    let t;
+    if (k === 0) { // hatchling rests, curls back to eat its shell, straightens
+      PLAN.push({ type: 'hold', t0: 12.9, t1: 14.6, anchor: 'head', sRest: h, k, mm0: 2, mm1: 2, bend: true });
+      t = 14.6;
+    } else {      // moult: crawl forward out of the old skin, a size larger
+      const Lold = lenPx(mm), Lnew = lenPx(I.mm[0]), tail = h - Lold, d = .2 * Lnew;
+      PLAN.push({ type: 'exit', t0: a, t1: a + .9, anchor: 'tail', sRest: tail, d, m: Math.max(1, Math.round(d / (.12 * Lnew))), k, mm0: mm, mm1: I.mm[0] });
+      HUSKS.push({ t0: a, s: tail + .2 * Lold, len: .3 * Lold, r: .068 * Lold });
+      mm = I.mm[0]; h = tail + d + Lnew; t = a + .9;
+    }
+    INSTAR_WIN.push([t - .1, b - .22]);
+    const rest = b - t, fr = k < 4 ? [.34, .36, .12, .18] : [.3, .36, .34, 0];
+    let L = lenPx(mm), tgt = Math.max(sAtX(leafLUT, targets[k][0]), h + .12 * L);
+    crawl(t, t + fr[0] * rest, 'head', h, tgt - h, L, k); h = tgt; t += fr[0] * rest;
+    const r1 = .068 * lenPx(I.mm[1]);
+    const bite = { t0: t, t1: t + fr[1] * rest, s: h + r1 * 1.05, R: r1 * 1.55, chews: 4 + k };
+    BITES.push(bite);
+    PLAN.push({ type: 'feed', t0: t, t1: t + fr[1] * rest, anchor: 'head', sRest: h, k, mm0: mm, mm1: I.mm[1], bite });
+    mm = I.mm[1]; t += fr[1] * rest; L = lenPx(mm);
+    tgt = Math.max(sAtX(leafLUT, targets[k][1]), h + .08 * L);
+    crawl(t, t + fr[2] * rest, 'head', h, tgt - h, L, k); h = tgt; t += fr[2] * rest;
+    if (k < 4) PLAN.push({ type: 'hold', t0: t, t1: b, anchor: 'head', sRest: h, k, mm0: mm, mm1: mm, dull: true });
+  }
+  // chapter III opening: the grown caterpillar walks off the right side of the leaf
+  const L = lenPx(45);
+  crawl(36, 37.7, 'head', h, 400, L, 4);
+})();
+
+function biteRadius(b, t) {
+  const p = seg(t, b.t0 + .08 * (b.t1 - b.t0), b.t1 - .06 * (b.t1 - b.t0));
+  if (p <= 0) return 0;
+  const f = p * b.chews, i = Math.floor(f);
+  const k = i >= b.chews ? 1 : (i + smoothstep(.15, .65, f - i)) / b.chews;
+  return b.R * Math.sqrt(k);
+}
+(function buildBites() {
+  for (const b of BITES) {
+    const p = lutAt(leafLUT, b.s);
+    b.cx = p.x; b.cy = p.y;
+    b.hole = el('circle', { cx: F(p.x), cy: F(p.y), r: 0 }, $('biteHoles'));
+    b.rim = el('circle', { cx: F(p.x), cy: F(p.y), r: 0 }, S.notchRims);
+  }
+})();
+(function buildHusks() {
+  for (const h of HUSKS) {
+    const g = el('g', { opacity: 0 }, $('husks'));
+    const pts = [];
+    for (let i = 0; i < 22; i++) {
+      const a = i / 22 * Math.PI * 2, j = 1 + .34 * (hash(i * 3.1 + h.s) - .5);
+      pts.push([Math.cos(a) * .5 * j, Math.sin(a) * .42 * j * (a > Math.PI ? 1.1 : .7) - .08]);
+    }
+    const outline = polyline(pts, true);
+    el('clipPath', { id: 'husk' + HUSKS.indexOf(h) }, defs).appendChild(el('path', { d: outline }));
+    el('path', { d: outline, fill: '#9E9888', stroke: PAL.outline, 'stroke-width': .75, 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }, g);
+    const bands = el('g', { 'clip-path': `url(#husk${HUSKS.indexOf(h)})`, fill: PAL.catBlack, opacity: .28 }, g);
+    for (let i = 0; i < 5; i++) el('rect', { x: F(-.42 + i * .19 + .04 * hash(i + h.s)), y: -.6, width: .06, height: 1.2, transform: `rotate(${F(12 * (hash(i + 5) - .5))})` }, bands);
+    el('path', { d: 'M-0.34 -0.12 l0.12 0.08 l0.1 -0.1 l0.12 0.1 M-0.1 0.08 l0.14 -0.06 l0.12 0.07 l0.14 -0.08', fill: 'none', stroke: PAL.outline, 'stroke-width': .5, 'vector-effect': 'non-scaling-stroke', opacity: .65 }, g);
+    el('path', { d: 'M0.4 -0.32 q0.08 -0.2 -0.02 -0.34 M0.44 -0.28 q0.14 -0.16 0.08 -0.3', fill: 'none', stroke: PAL.catBlack, 'stroke-width': .8, 'vector-effect': 'non-scaling-stroke' }, g);
+    const p = offsetPt(lutAt(leafLUT, h.s), h.r * .5);
+    g.setAttribute('transform', `translate(${F(p.x)} ${F(p.y)}) rotate(${F(p.a * DEG)}) scale(${F(h.len)} ${F(h.r * 1.5)})`);
+    h.g = g;
+  }
+})();
+
+/* the larva's state on the leaf is a pure function of t, looked up in PLAN */
+function larvaState(t) {
+  let P = PLAN[0];
+  for (const q of PLAN) { if (t >= q.t0) P = q; else break; }
+  const u = seg(t, P.t0, P.t1);
+  const st = { anchor: P.anchor, sRest: P.sRest, sigma: 0, phi: 0, k: P.k, colorK: P.k, dull: 0, pitch: .05, dip: 0, bend: 0, headShift: 0 };
+  let mm = P.mm0;
+  if (P.type === 'crawl' || P.type === 'exit') {
+    const n = P.m * (.8 * u + .2 * easeInOutSine(u));
+    let kk = Math.floor(n), ph = n - kk; if (kk >= P.m) { kk = P.m; ph = 0; }
+    st.sigma = P.d / P.m; st.phi = ph; st.sRest = P.sRest + kk * st.sigma;
+    if (P.type === 'exit') {
+      mm = lerp(P.mm0, P.mm1, easeInOutCubic(seg(u, 0, .7)));
+      st.colorK = P.k - 1 + easeInOutSine(seg(u, .05, .75));
+      st.dull = .5 * (1 - seg(u, 0, .35));
+    }
+  } else if (P.type === 'feed') {
+    mm = lerp(P.mm0, P.mm1, easeInOutSine(u));
+    const env = smoothstep(0, .08, u) * (1 - smoothstep(.92, 1, u));
+    st.pitch = .05 + env * (.5 + .24 * Math.sin(2 * Math.PI * u * P.bite.chews * 2));
+    st.headShift = env * .12 * st.pitch;
+    st.dip = env * biteRadius(P.bite, t) * .5;
+  } else if (P.type === 'hold') {
+    if (P.dull) { st.dull = .5 * smoothstep(.1, .7, u); st.pitch = .05 + .12 * smoothstep(0, .4, u); }
+    if (P.bend) {
+      st.bend = smoothstep(12.9, 13.25, t) * (1 - smoothstep(13.85, 14.5, t));
+      const chew = seg(t, 13.2, 13.85);
+      st.pitch = .05 + (chew > 0 && chew < 1 ? .35 + .3 * Math.sin(chew * Math.PI * 8) : 0) * st.bend;
+    }
+  }
+  st.mm = mm; st.L = lenPx(mm); st.R = .068 * st.L;
+  return st;
+}
+
+/* =====================================================================
+   6. SCENE — CHAPTERS I & II (and the start of III) on the leaf
+   ===================================================================== */
+const leafRig = createRig($('larvaLayer'), 'leafRig', true);
+const leafPose = makePose();
+
+function renderEgg(t) {
+  show($('eggFront'), t >= 11.3 && t < 12.9);
+  const dark = .85 * smoothstep(9, 11, t) * (1 - seg(t, 11.35, 11.6));
+  setA(EGG.dark, 'opacity', F(dark));
+  setA(EGG.body, 'fill', t < 8 ? PAL.egg : mixHex(PAL.egg, '#D8D0B8', smoothstep(8, 11, t)));
+  const holeR = 7 * easeInOutSine(seg(t, 11.0, 11.5));
+  const bites = seg(t, 13.2, 13.85) * 4, bi = Math.floor(bites);
+  const cut = bi >= 4 ? 1 : (bi + smoothstep(.2, .7, bites - bi)) / 4;
+  const uc = 1 - .44 * cut;
+  let d = '';
+  setA($('eggHole'), 'd', holeR > .05 ? circlePath(0, -EGG_H + 1.5, F(holeR)) : 'M0 0');
+  if (uc < .995) {
+    const y0 = -EGG_H * uc, line = [];
+    for (let i = 0; i <= 10; i++) line.push([19 - i * 3.8, y0 + EGG.jag[i] * 2.4]);
+    d += 'M24 -78 L24 ' + F(y0) + polyline(line).replace('M', 'L') + 'L-24 ' + F(y0) + 'L-24 -78Z';
+    EGG.rim.setAttribute('d', polyline(line));
+    setA(EGG.inner, 'cy', F(y0)); setA(EGG.inner, 'rx', F(eggHW(uc) * .85));
+  }
+  setA(EGG.rim, 'opacity', uc < .995 ? '1' : '0');
+  setA(EGG.inner, 'opacity', uc < .995 ? '0.75' : '0');
+  setA($('eggCut'), 'd', d || 'M0 0');
+  S.eggAnchor = (() => { const p = eggToWorld(7, -27); return { x: p[0], y: p[1] }; })();
+}
+
+function renderLarva(t, day) {
+  if (t < 11.35) { show(leafRig.g, false); S.headPt = null; S.larva = null; return; }
+  show(leafRig.g, true);
+  let st, surf, s0;
+  if (t < 12.9) {                          // hatching: along the exit path
+    const L = lenPx(2), R = .068 * L;
+    const aHead0 = EXIT.tipA - 3, aEnd = EXIT.joinA + (LARVA_START - EXIT.joinS);
+    st = { anchor: 'head', L, R, sigma: 0, phi: 0, k: 0, colorK: 0, dull: 0, pitch: .05, mm: 2, dip: 0, bend: 0 };
+    if (t < 11.9) st.sRest = lerp(aHead0 - 7, aHead0, easeInOutSine(seg(t, 11.35, 11.9)));
+    else {
+      const u = seg(t, 11.9, 12.9), m = 5, n = m * (.8 * u + .2 * easeInOutSine(u));
+      let kk = Math.floor(n), ph = n - kk; if (kk >= m) { kk = m; ph = 0; }
+      st.sigma = (aEnd - aHead0) / m; st.phi = ph; st.sRest = aHead0 + kk * st.sigma;
+    }
+    surf = exitSurf;
+  } else { st = larvaState(t); surf = leafSurf; }
+  surfacePose(leafPose, surf, st);
+  if (st.bend > 0) bendPose(leafPose, .14, -3.45 * st.bend);
+  fixAngles(leafPose);
+
+  const look = instarLook(st.colorK);
+  const dayPh = Math.sin(2 * Math.PI * (day - Math.floor(day)));
+  look.dull = st.dull; look.pitch = st.pitch; look.headShift = (st.headShift || 0) * st.R; look.time = t;
+  const tailS = leafPose.s[0], headS = leafPose.s[NSEG];
+  if (surf === leafSurf) {
+    const mid = lutAt(leafLUT, (tailS + headS) / 2);
+    look.shadow = { x: mid.x - Math.sin(mid.a) * st.R * .5 + Math.cos(mid.a) * dayPh * st.R * .6, y: mid.y + Math.cos(mid.a) * st.R * .5,
+      a: mid.a, rx: st.L * .56, ry: st.R * .75 };
+  } else look.shadow = null;
+  drawRig(leafRig, leafPose, look);
+  S.larva = { st, tailS, headS, surf };
+  S.headPt = { x: leafRig.headPt.x, y: leafRig.headPt.y };
+}
+
+function renderTrail(t) {
+  const tr = $('trail'), L = S.larva;
+  const on = t >= 14.3 && L && L.surf === leafSurf;
+  const sEnd = on ? L.tailS - L.st.R * .9 - 5 : 0, sStart = EXIT.joinS + 2;
+  if (!on || sEnd < sStart + 3) { setA(tr, 'opacity', '0'); return; }
+  const pts = [];
+  for (let s = sStart; s < sEnd; s += 6) { const p = offsetPt(lutAt(leafLUT, s), 1.8); pts.push([p.x, p.y]); }
+  const p = offsetPt(lutAt(leafLUT, sEnd), 1.8); pts.push([p.x, p.y]);
+  tr.setAttribute('d', polyline(pts));
+  setA(tr, 'opacity', F(.75 * seg(t, 14.3, 15.2)));
+}
+
+function renderScaleBar(t) {
+  const g = $('scaleBar'), L = S.larva;
+  const vis = L && L.surf === leafSurf ? seg(t, 14.7, 15.4) * (1 - seg(t, 35.9, 36.5)) : 0;
+  setA(g, 'opacity', F(vis));
+  if (vis <= 0) return;
+  const r = L.st.R;
+  const a = lutAt(leafLUT, L.tailS - r * .5), b = lutAt(leafLUT, L.headS + r * 1.25);
+  const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.hypot(b.x - a.x, b.y - a.y);
+  const off = 24 + r * .4;
+  const mx = (a.x + b.x) / 2 - Math.sin(ang) * off, my = (a.y + b.y) / 2 + Math.cos(ang) * off;
+  g.setAttribute('transform', `translate(${F(mx)} ${F(my)}) rotate(${F(ang * DEG)})`);
+  const hl = F(len / 2);
+  setA($('sbLine'), 'x1', -hl); setA($('sbLine'), 'x2', hl);
+  setA($('sbT1'), 'x1', -hl); setA($('sbT1'), 'x2', -hl);
+  setA($('sbT2'), 'x1', hl); setA($('sbT2'), 'x2', hl);
+  const txt = Math.round(L.st.mm) + ' mm';
+  if ($('sbText').textContent !== txt) $('sbText').textContent = txt;
+}
+
+function renderLeafScene(t, day) {
+  const scene = $('leafScene');
+  const on = t >= 4 && t < 37.7;
+  show(scene, on);
+  if (!on) { S.larva = null; S.headPt = null; return; }
+  const rise = 430 * (1 - easeInOutCubic(seg(t, 4, 5.9)));
+  S.rise = rise;
+  scene.setAttribute('transform', `translate(0 ${F(rise)})`);
+  $('fgLeaf').setAttribute('transform', `translate(0 ${F(rise * .45)})`);
+  setA(scene, 'opacity', F(1 - seg(t, 37.0, 37.6)));
+  // time-lapse light: shading shifts a little with the sun
+  const ph = Math.cos(2 * Math.PI * (day - Math.floor(day)));
+  setA(S.leafHatch, 'opacity', F(.26 + .06 * ph));
+  for (const b of BITES) { const r = F(biteRadius(b, t)); setA(b.hole, 'r', r); setA(b.rim, 'r', r); }
+  renderEgg(t);
+  renderLarva(t, day);
+  for (const h of HUSKS) setA(h.g, 'opacity', F(seg(t, h.t0 + .15, h.t0 + .6)));
+  renderTrail(t);
+  renderScaleBar(t);
+  if (S.headPt) S.headPt.y += rise;
+  if (S.eggAnchor) S.eggAnchor.y += rise;
+}
+
+/* =====================================================================
+   7. SCENE — CHAPTER III: the J (twig, silk pad, hanging)
+   ===================================================================== */
+const twigRig = createRig($('hangLayer'), 'twigRig', false);
+const twigPose = makePose();
+const TW_L = 300, TW_R = .068 * TW_L;
+const TW_HW = TWIG.sP - 1.3 * TW_R;           // head position while spinning the pad
+
+const pad = {
+  ell: el('ellipse', { cx: F(PX), cy: F(PY + 1.5), rx: 0, ry: 0, fill: PAL.spot, stroke: PAL.ink, 'stroke-width': .5, 'stroke-opacity': .5 }, $('padG')),
+  strands: []
+};
+for (let i = 0; i < 7; i++) {
+  const dx = (i - 3) * 6 + (hash(i) - .5) * 4;
+  pad.strands.push(el('path', { d: `M${F(PX + dx * .4)} ${F(PY + 2)} q${F(dx * .8)} ${F(3 + hash(i + 9) * 4)} ${F(dx * 1.9)} ${F(-2 - hash(i + 3) * 2)}`,
+    fill: 'none', stroke: PAL.spot, 'stroke-width': .6, opacity: 0 }, $('padG')));
+}
+
+/* chapter III/IV caterpillar & skin; returns false when not visible */
+function twigLarva(t) {
+  if (t < 37.4 || t > 48.5) return null;
+  const look = instarLook(4);
+  look.time = t;
+  let sway = 0;
+  if (t < 42.1) {
+    const st = { R: TW_R, L: TW_L, sigma: 0, phi: 0, anchor: 'head', sRest: TW_HW, dip: 0 };
+    const crawlSt = (t0, t1, anchor, s0, d, m) => {
+      const u = seg(t, t0, t1), n = m * (.8 * u + .2 * easeInOutSine(u));
+      let kk = Math.floor(n), ph = n - kk; if (kk >= m) { kk = m; ph = 0; }
+      st.anchor = anchor; st.sigma = d / m; st.phi = ph; st.sRest = s0 + kk * st.sigma;
+    };
+    if (t < 39.3) crawlSt(37.4, 39.3, 'head', TW_HW - 200, 200, 3);
+    else if (t < 40.4) { // weaving the silk pad
+      const w = seg(t, 39.3, 40.4), env = Math.sin(Math.PI * w);
+      look.pitch = .1 + env * (.45 + .25 * Math.sin(2 * Math.PI * 2.4 * (t - 39.3)));
+      look.headShift = env * TW_R * .35 * Math.sin(2 * Math.PI * 1.2 * (t - 39.3));
+    } else crawlSt(40.4, 42.1, 'tail', TW_HW - TW_L, TWIG.sP - (TW_HW - TW_L), 5);
+    surfacePose(twigPose, twigSurf, st);
+  } else {
+    // hanging: stage 1 the front lets go and drops, stage 2 it curls into a J
+    const k1 = easeInOutSine(seg(t, 42.1, 42.9)), k2 = easeInOutSine(seg(t, 42.7, 43.5));
+    const pre = easeInOutSine(seg(t, 44.0, 44.6));                 // pre-pupa straightening
+    const q = easeInOutSine(seg(t, 44.6, 46.6));                   // skin rolling up
+    sway = chrysSway(t);
+    let curl = lerp(2.9, 1.05, pre) * (1 - q) * k2;
+    const L = lerp(TW_L, 252, pre) * (1 - .84 * q) * (1 + .01 * Math.sin(2 * Math.PI * .6 * t) * k2);
+    const Rm = lerp(1, 1.1, pre) * (1 + .22 * q);
+    const n0 = [Math.sin(TWIG.aP) * TW_R * 1.22, -Math.cos(TWIG.aP) * TW_R * 1.22];
+    const o = rot(n0[0], n0[1], sway);
+    const heading = v => {
+      const w1 = smoothstep(0, 1, k1 * 1.7 - (1 - v) * .7);
+      return lerp(TWIG.aP, Math.PI / 2, w1) + curl * smoothstep(.5, 1, v) + sway * w1;
+    };
+    curvePose(twigPose, PX + o[0], PY + o[1], L, TW_R, heading,
+      (v, j) => Rm * (1 + .2 * q * Math.sin(j * 2.3)));
+    look.limp = smoothstep(43.4, 44.4, t);
+    look.headOp = 1 - seg(t, 44.6, 44.85);
+    look.filScale = 1 - q;
+    look.legOp = 1 - q;
+    look.dull = .25 * pre + .5 * q;
+  }
+  fixAngles(twigPose);
+  return look;
+}
+
+/* damped pendulum sway of the hanging form: wriggles during the moult, then breezes */
+const BREEZES = [[50.9, .075], [53.2, .05], [55.2, .062]];
+function chrysSway(t) {
+  let a = 0;
+  if (t > 42.8 && t < 44.8) a += .035 * Math.sin(2 * Math.PI * .32 * (t - 42.8)) * smoothstep(42.8, 43.4, t) * (1 - smoothstep(44.2, 44.8, t));
+  if (t > 44.6 && t < 47.4) a += .1 * Math.sin(2 * Math.PI * 1.45 * (t - 44.6)) * Math.sin(Math.PI * seg(t, 44.6, 47.4));
+  for (const [t0, A] of BREEZES) if (t > t0) {
+    const u = t - t0;
+    a += A * Math.exp(-u / 1.3) * Math.sin(2 * Math.PI * .55 * u) * smoothstep(0, .4, u);
+  }
+  return a;
+}
+
+/* =====================================================================
+   8. SCENE — CHAPTER IV: the chrysalis
+   ===================================================================== */
+const PUPA_M = 22;
+const CH_L = 196, CH_CUT = 14 + .78 * CH_L;       // chrysalis length; where the shell tears at eclosion
+const chY = y => 14 + (y - 14) * CH_L / 176;        // design coordinates were drawn for a 176-long chrysalis
+function rSoft(v) { return 21 * (.45 + .55 * Math.sin(Math.PI * (.06 + .86 * v))) + 1.3 * Math.sin(v * 44); }
+function rFinal(v) { return 61 * Math.pow(Math.max(0, Math.sin(Math.PI * (.05 + .9 * v))), .55); }
+function pupaPts(m, y0) {
+  const L = lerp(236, CH_L, m), curl = lerp(1.05, 0, m);
+  let x = 0, y = y0; const sp = [];
+  for (let i = 0; i <= PUPA_M; i++) {
+    const v = i / PUPA_M, a = Math.PI / 2 + curl * smoothstep(.5, 1, v);
+    sp.push({ x, y, a, r: lerp(rSoft(v), rFinal(v), m) });
+    const a2 = Math.PI / 2 + curl * smoothstep(.5, 1, (i + .5) / PUPA_M);
+    x += Math.cos(a2) * L / PUPA_M; y += Math.sin(a2) * L / PUPA_M;
+  }
+  const right = sp.map(p => [p.x + Math.sin(p.a) * p.r, p.y - Math.cos(p.a) * p.r]);
+  const left = sp.map(p => [p.x - Math.sin(p.a) * p.r, p.y + Math.cos(p.a) * p.r]);
+  const s0 = sp[0], sN = sp[PUPA_M];
+  return [[s0.x - Math.cos(s0.a) * s0.r * .35, s0.y - Math.sin(s0.a) * s0.r * .35]].concat(right,
+    [[sN.x + Math.cos(sN.a) * sN.r * .55, sN.y + Math.sin(sN.a) * sN.r * .55]], left.reverse());
+}
+const CHRY = {};
+(function buildPupa() {
+  const g = $('pupaG');
+  CHRY.g = g;
+  CHRY.crem = el('g', { opacity: 0 }, g);
+  el('path', { d: 'M-1.7 -1 L-2.6 11 Q0 16.5 2.6 11 L1.7 -1Z', fill: PAL.catBlack }, CHRY.crem);
+  el('ellipse', { cx: 0, cy: 12.5, rx: 5.5, ry: 2.2, fill: PAL.catBlack }, CHRY.crem);
+  const m = el('g', { mask: 'url(#shellMask)' }, g);
+  CHRY.body = el('use', { href: '#pupaShape', fill: 'url(#gChrys)' }, m);
+  CHRY.soft = el('use', { href: '#pupaShape', fill: PAL.jade }, m);
+  const cl = el('g', { 'clip-path': 'url(#chrysClip)' }, m);
+  el('rect', { x: -70, y: 0, width: 38, height: 220, fill: 'url(#hatchFine)', opacity: .38 }, cl);
+  el('rect', { x: 34, y: 0, width: 30, height: 220, fill: 'url(#hatchFine)', opacity: .18 }, cl);
+  CHRY.dark = el('use', { href: '#pupaShape', fill: '#2B2822', opacity: 0 }, m);
+  // folded forewing that shows through the clearing shell (days 25–27)
+  CHRY.wing = el('g', { opacity: 0, 'clip-path': 'url(#chrysClip)' }, m);
+  const wingIn = el('g', { transform: `translate(0 14) scale(1.1 ${F(CH_L / 176)}) translate(0 -14)` }, CHRY.wing);
+  const wp = [[-22, 42], [14, 32], [40, 50], [52, 92], [48, 136], [30, 168], [6, 182], [-14, 170], [-26, 132], [-32, 86]];
+  el('path', { d: smoothClosed(wp), fill: PAL.deepOrange, stroke: PAL.wingBlack, 'stroke-width': 9 }, wingIn);
+  const wv = el('g', { stroke: PAL.wingBlack, 'stroke-width': 2.4, fill: 'none', 'stroke-linecap': 'round' }, wingIn);
+  for (const [x, y] of [[40, 56], [50, 92], [46, 132], [28, 164], [4, 178], [-18, 160]]) el('path', { d: `M-12 60 Q${F(x * .4)} ${F(y * .7)} ${x} ${y}` }, wv);
+  el('path', { d: 'M-12 60 Q10 90 2 128', stroke: PAL.wingBlack, 'stroke-width': 2, fill: 'none' }, wingIn);
+  const ws = el('g', { fill: PAL.spot }, wingIn);
+  for (let i = 1; i < 9; i++) { const k = i / 9, p = wp[Math.floor(k * 6) + 2]; el('circle', { cx: F(p[0] * .96), cy: F(p[1]), r: 1.6 }, ws); }
+  CHRY.sheen = el('use', { href: '#pupaShape', fill: PAL.sage, opacity: 0 }, m);
+  CHRY.paper = el('use', { href: '#pupaShape', fill: '#E6DFC8', opacity: 0 }, m);
+  CHRY.contours = el('g', { fill: 'none', stroke: '#6F7A5E', 'stroke-width': .7, opacity: 0 }, m);
+  for (const f of [-.62, -.1, .38, .7]) {
+    const pts = []; for (let v = .16; v <= .96; v += .08) pts.push([f * rFinal(v) * (1 - .1 * Math.abs(v - .5)), 14 + CH_L * v]);
+    el('path', { d: smoothOpen(pts) }, CHRY.contours);
+  }
+  // black-edged band with gold dots across the upper third
+  CHRY.band = el('g', { opacity: 0 }, m);
+  const yb = 14 + CH_L * .3, rb = rFinal(.3);
+  el('path', { d: `M${F(-rb * .97)} ${F(yb + 3)} Q0 ${F(yb + 13)} ${F(rb * .97)} ${F(yb + 3)}`, fill: 'none', stroke: PAL.catBlack, 'stroke-width': 2.4 }, CHRY.band);
+  el('path', { d: `M${F(-rb * .97)} ${F(yb + 6.5)} Q0 ${F(yb + 16.5)} ${F(rb * .97)} ${F(yb + 6.5)}`, fill: 'none', stroke: PAL.catBlack, 'stroke-width': .6, opacity: .6 }, CHRY.band);
+  CHRY.dots = [];
+  const dotAt = (x, y, r) => {
+    el('circle', { cx: F(x), cy: F(y), r, fill: PAL.gold, stroke: PAL.outline, 'stroke-width': .35 }, CHRY.band);
+    CHRY.dots.push({ x, y, hl: el('circle', { cx: F(x - r * .3), cy: F(y - r * .3), r: F(r * .5), fill: '#F2E3B0', opacity: 0 }, CHRY.band) });
+  };
+  for (let i = 0; i < 7; i++) { const f = (i - 3) / 3.4, x = f * rb * .9; dotAt(x, yb + 3 + 10 * (1 - f * f) - 4.2, 2.3); }
+  for (const [x, y, r] of [[-30, 150, 1.9], [30, 152, 1.9], [-17, 171, 1.6], [16, 172, 1.6], [-9, 27, 1.5], [9, 27, 1.5], [-40, 118, 1.4], [42, 116, 1.4]]) dotAt(x * 1.1, chY(y), r);
+  CHRY.outline = el('use', { href: '#pupaShape', fill: 'none', stroke: PAL.outline, 'stroke-width': 1.1 }, m);
+  // eclosion: crack, torn flaps
+  CHRY.crack = el('path', { d: `M3 ${F(12 + CH_L)} L-2 ${F(CH_CUT + 31)} L4 ${F(CH_CUT + 23)} L-3 ${F(CH_CUT + 15)} L2 ${F(CH_CUT + 7)} L-1 ${F(CH_CUT)}`, fill: 'none', stroke: PAL.outline, 'stroke-width': 1.1,
+    'stroke-dasharray': '46 46', 'stroke-dashoffset': 46, opacity: 0 }, g);
+  const jag = [];
+  for (let i = 0; i <= 14; i++) jag.push([-70 + i * 10, CH_CUT + (hash(i + 70) - .5) * 9]);
+  $('shellCut').setAttribute('d', polyline(jag).replace('M', 'M-70 300 L') + 'L70 300Z');
+  CHRY.flaps = [];
+  for (const [x0, x1, len, dir] of [[-44, -22, 32, -1], [-11, 11, 26, 1], [22, 46, 30, 1]]) {
+    const fg = el('g', { opacity: 0 }, g);
+    const ytop = CH_CUT + (hash(x0 + 99) - .5) * 4;
+    el('path', { d: `M${x0} ${F(ytop)} L${x1} ${F(ytop + 1)} L${F((x0 + x1) / 2 + dir * 4)} ${F(ytop + len)} Z`,
+      fill: '#E4DCC3', 'fill-opacity': .85, stroke: PAL.outline, 'stroke-width': .7 }, fg);
+    CHRY.flaps.push({ g: fg, px: (x0 + x1) / 2, py: ytop, dir });
+  }
+})();
+
+function renderPupa(t) {
+  const on = t >= 44.6;
+  show(CHRY.g, on);
+  if (!on) return;
+  const m = easeInOutSine(seg(t, 47.4, 50.4));
+  const sway = chrysSway(t), lift = 0;
+  const y0 = lerp(27, 14, easeInOutSine(seg(t, 46.5, 47.2)));   // pulls up to hook the cremaster
+  CHRY.g.setAttribute('transform', `translate(${F(PX)} ${F(PY)}) rotate(${F(sway * DEG)})`);
+  const key = F(m) + ',' + F(y0);
+  if (CHRY.lastM !== key) { CHRY.lastM = key; $('pupaShape').setAttribute('d', smoothClosed(pupaPts(m, y0))); }
+  setA(CHRY.crem, 'opacity', F(seg(t, 46.4, 47.0)));
+  setA(CHRY.soft, 'opacity', F(1 - m));
+  const detail = seg(t, 49.4, 50.8);
+  const clear = easeInOutSine(seg(t, 55.6, 58.2)) * (1 - seg(t, 58.8, 60.4));
+  const paper = seg(t, 58.8, 60.4);
+  setA(CHRY.contours, 'opacity', F(detail * .55 * (1 - .5 * paper)));
+  setA(CHRY.band, 'opacity', F(detail * (1 - .45 * paper)));
+  setA(CHRY.dark, 'opacity', F(.86 * clear));
+  setA(CHRY.wing, 'opacity', F(.92 * clear));
+  setA(CHRY.sheen, 'opacity', F(.2 * clear));
+  setA(CHRY.paper, 'opacity', F(.62 * paper));
+  // slow shimmer travelling across the gold dots
+  if (detail > 0) for (const d of CHRY.dots) {
+    const s = Math.max(0, Math.sin(t * 1.15 - d.x * .05 - d.y * .02));
+    setA(d.hl, 'opacity', F((.12 + .75 * Math.pow(s, 8)) * (1 - paper)));
+  }
+  const crack = seg(t, 58.5, 59.1);
+  setA(CHRY.crack, 'opacity', crack > 0 ? F(1 - seg(t, 59.4, 59.8)) : '0');
+  setA(CHRY.crack, 'stroke-dashoffset', F(46 * (1 - crack)));
+  setA($('shellCut'), 'fill-opacity', F(seg(t, 59.0, 59.5)));
+  const open = easeInOutSine(seg(t, 59.2, 61.2));
+  for (const f of CHRY.flaps) {
+    setA(f.g, 'opacity', F(seg(t, 59.05, 59.5)));
+    f.g.setAttribute('transform', `rotate(${F(f.dir * 20 * open)} ${F(f.px)} ${F(f.py)})`);
+  }
+  const toW = (lx, ly) => { const r = rot(lx, ly, sway); return { x: PX + r[0], y: PY + lift + r[1] }; };
+  S.cremPt = toW(-2, 7);
+  S.chrysPt = toW(rFinal(.45) * .92, 14 + CH_L * .45);
+}
+
+/* =====================================================================
+   9. SCENE — CHAPTERS V & VI: eclosion, the imago, flight
+   ===================================================================== */
+const WING_DEFS = {
+  fw: {
+    base: [4, -8],
+    outline: [[0, -4], [22, -26], [55, -58], [92, -90], [130, -116], [160, -130], [176, -131], [181, -121], [180, -100], [174, -74], [164, -48], [150, -24], [134, -4], [118, 6], [88, 9], [56, 8], [26, 5], [6, 3]],
+    orange: [[9, -6], [30, -24], [60, -50], [96, -78], [124, -95], [140, -97], [149, -86], [152, -66], [146, -44], [134, -22], [120, -7], [100, -1], [70, 1], [40, 0], [16, -1]],
+    veins: [[[8, -8], [50, -44], [96, -74], [140, -100]], [[96, -74], [152, -82]], [[10, -4], [60, -30], [100, -50], [156, -60]],
+      [[12, -2], [70, -18], [108, -30], [150, -40]], [[14, 0], [80, -8], [140, -20]], [[16, 2], [80, 3], [126, -4]], [[96, -74], [100, -50], [108, -30]]],
+    margin: [6, 12],
+    extra: [[150, -112, 3], [160, -108, 2.6], [141, -106, 2.4], [132, -101, 2], [168, -99, 2.1], [120, -104, 1.6], [110, -98, 1.4]],
+    orangeSpots: [[160, -91, 2.6], [166, -79, 2.3], [156, -99, 1.8]]
+  },
+  hw: {
+    base: [4, 4],
+    outline: [[0, 2], [30, 4], [70, 10], [106, 24], [128, 48], [134, 76], [126, 104], [106, 128], [80, 142], [54, 146], [32, 136], [16, 110], [6, 70], [1, 34]],
+    orange: null,
+    veins: [[[10, 12], [62, 30], [72, 50], [58, 72], [40, 76], [20, 56], [10, 12]], [[72, 50], [124, 66]], [[70, 40], [118, 44]], [[66, 62], [118, 100]],
+      [[60, 70], [96, 126]], [[52, 76], [70, 138]], [[40, 76], [46, 140]], [[28, 68], [26, 122]], [[62, 30], [102, 26]]],
+    margin: [3, 11],
+    extra: [], orangeSpots: []
+  }
+};
+WING_DEFS.hw.orange = WING_DEFS.hw.outline.map(([x, y]) => [48 + (x - 48) * .8, 60 + (y - 60) * .8]);
+function marginSpots(poly, i0, i1, rows) {
+  let cx = 0, cy = 0; for (const p of poly) { cx += p[0]; cy += p[1]; } cx /= poly.length; cy /= poly.length;
+  const out = [];
+  for (const [inset, spacing, r] of rows) {
+    let acc = spacing * .5;
+    for (let i = i0; i < i1; i++) {
+      const [ax, ay] = poly[i], [bx, by] = poly[i + 1], L = Math.hypot(bx - ax, by - ay);
+      let nx = -(by - ay) / L, ny = (bx - ax) / L;
+      if ((cx - ax) * nx + (cy - ay) * ny < 0) { nx = -nx; ny = -ny; }
+      while (acc < L) { const k = acc / L; out.push([ax + (bx - ax) * k + nx * inset, ay + (by - ay) * k + ny * inset, r]); acc += spacing; }
+      acc -= L;
+    }
+  }
+  return out;
+}
+WING_DEFS.fw.spots = marginSpots(WING_DEFS.fw.outline, 6, 13, [[4.6, 8.5, 2.1], [11.5, 11, 1.8]]).concat(WING_DEFS.fw.extra);
+WING_DEFS.hw.spots = marginSpots(WING_DEFS.hw.outline, 3, 11, [[4.4, 8.5, 2], [10.5, 11.5, 1.7]]);
+
+/* crumpled state: same points, wrinkled and folded — identical path structure */
+function crumple([x, y]) {
+  const d = Math.hypot(x, y) + 1e-6, a = Math.atan2(y, x);
+  const wr = 1 + .11 * Math.sin(a * 9 + d * .07) + .06 * Math.sin(d * .19);
+  const ta = a + .2 * Math.sin(d * .045 + a * 3) * Math.min(1, d / 40) + .25;
+  const dd = d * .8 * wr;
+  return [Math.cos(ta) * dd, Math.sin(ta) * dd];
+}
+function wingStrings(def, xf) {
+  const T = p => xf(p);
+  return {
+    outline: smoothClosed(def.outline.map(T)),
+    orange: smoothClosed(def.orange.map(T)),
+    veins: def.veins.map(v => smoothOpen(v.map(T))).join(''),
+    spots: def.spots.map(([x, y, r]) => { const q = T([x, y]); return circlePath(q[0], q[1], r); }).join(''),
+    ospots: def.orangeSpots.length ? def.orangeSpots.map(([x, y, r]) => { const q = T([x, y]); return circlePath(q[0], q[1], r); }).join('') : 'M0 0'
+  };
+}
+const BF = { parts: [] };
+(function buildButterfly() {
+  const root = el('g', { display: 'none' }, $('bflyG'));
+  BF.g = root;
+  const tpl = {};
+  for (const w of ['hw', 'fw']) {
+    const A = wingStrings(WING_DEFS[w], p => p), B = wingStrings(WING_DEFS[w], crumple);
+    tpl[w] = {};
+    for (const k in A) tpl[w][k] = { exp: pathTemplate(A[k]), cr: pathTemplate(B[k]) };
+  }
+  BF.tpl = tpl;
+  BF.sides = [];
+  for (const side of [-1, 1]) {
+    const sg = el('g', {}, root), wings = {};
+    for (const w of ['hw', 'fw']) {
+      const g = el('g', {}, sg), P = {};
+      P.outline = el('path', { fill: PAL.wingBlack, stroke: PAL.outline, 'stroke-width': .8 }, g);
+      P.orange = el('path', { fill: PAL.orange }, g);
+      P.hatch = el('path', { fill: 'url(#hatchFine)', opacity: .16 }, g);
+      P.veins = el('path', { fill: 'none', stroke: PAL.wingBlack, 'stroke-width': 2.3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, g);
+      P.spots = el('path', { fill: PAL.spot }, g);
+      P.ospots = el('path', { fill: '#D0803F' }, g);
+      wings[w] = { g, P };
+    }
+    BF.sides.push({ side, g: sg, wings });
+  }
+  // body
+  const body = el('g', {}, root);
+  BF.legs = [];
+  const legG = el('g', { fill: 'none', stroke: PAL.wingBlack, 'stroke-width': 1.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, body);
+  for (const s of [-1, 1]) for (const [rx, ry, kx, ky, fx, fy] of [[6, -9, 19, -30, 12, -53], [7, 0, 24, -22, 21, -49]]) {
+    const p = el('path', { d: `M${s * rx} ${ry} L${s * kx} ${ky} L${s * fx} ${fy} l${s * 2.5} -3` }, legG);
+    BF.legs.push({ p, s, rx, ry });
+  }
+  BF.abd = el('ellipse', { cx: 0, cy: 46, rx: 15, ry: 40, fill: PAL.wingBlack, stroke: PAL.outline, 'stroke-width': .8 }, body);
+  BF.abdRings = el('g', { fill: 'none', stroke: PAL.spot, 'stroke-width': .5, opacity: .35 }, body);
+  for (let i = 0; i < 6; i++) el('path', { d: `M-7 ${24 + i * 10} Q0 ${27 + i * 10} 7 ${24 + i * 10}` }, BF.abdRings);
+  el('ellipse', { cx: 0, cy: -3, rx: 11.5, ry: 19, fill: PAL.wingBlack, stroke: PAL.outline, 'stroke-width': .8 }, body);
+  el('path', { d: 'M-6 -16 Q0 -20 6 -16', fill: 'none', stroke: PAL.spot, 'stroke-width': .8, opacity: .55 }, body);
+  const dots = el('g', { fill: PAL.spot }, body);
+  for (const [x, y, r] of [[-6, -9, 1.3], [6, -9, 1.3], [-8, 2, 1.1], [8, 2, 1.1], [0, -14, 1], [-4, 8, .9], [4, 8, .9]]) el('circle', { cx: x, cy: y, r }, dots);
+  el('circle', { cx: 0, cy: -27, r: 8.5, fill: PAL.wingBlack, stroke: PAL.outline, 'stroke-width': .8 }, body);
+  for (const s of [-1, 1]) {
+    el('circle', { cx: s * 5.4, cy: -29, r: 3.3, fill: '#3B342A' }, body);
+    el('circle', { cx: s * 5.9, cy: -30, r: .9, fill: PAL.spot, opacity: .6 }, body);
+    el('circle', { cx: s * 2.2, cy: -33.5, r: .9, fill: PAL.spot }, body);
+  }
+  BF.ant = [el('path', { fill: 'none', stroke: PAL.wingBlack, 'stroke-width': 1.3, 'stroke-linecap': 'round' }, body),
+            el('path', { fill: 'none', stroke: PAL.wingBlack, 'stroke-width': 1.3, 'stroke-linecap': 'round' }, body)];
+  BF.club = [el('ellipse', { rx: 2.2, ry: 3.6, fill: PAL.wingBlack }, body), el('ellipse', { rx: 2.2, ry: 3.6, fill: PAL.wingBlack }, body)];
+  const spiral = [];
+  for (let th = 0; th <= 4 * Math.PI; th += .35) { const r = 4.6 * (1 - th / (4.6 * Math.PI)); spiral.push([r * Math.cos(th), r * Math.sin(th)]); }
+  const sd = smoothOpen(spiral);
+  BF.prob = [el('path', { d: sd, fill: 'none', stroke: PAL.wingBlack, 'stroke-width': .9 }, body),
+             el('path', { d: sd, fill: 'none', stroke: PAL.wingBlack, 'stroke-width': .9 }, body)];
+  BF.body = body;
+})();
+
+/* pure butterfly state for time t */
+function bflyState(t) {
+  if (t < 59.2 || t > 78.8) return null;
+  const O0 = { x: PX, y: PY + CH_CUT + 52 };
+  const st = { O: { x: PX, y: PY + CH_CUT }, rot: Math.PI, sc: 1, e: 0, o: .5, droopF: 1.35, droopH: .8, abd: 15, ant: 0, zip: 0, flail: 0, legsOp: 1 };
+  if (t < 60.4) {                                   // head and legs push out, head down
+    const k = easeInOutSine(seg(t, 59.2, 60.4));
+    st.O.y = PY + CH_CUT + lerp(10, 48, k);
+    st.flail = Math.sin(t * 9) * .35;
+  } else if (t < 61.8) {                            // grips the shell and swings head-up
+    const k = easeInOutSine(seg(t, 60.4, 61.8));
+    st.rot = Math.PI * (1 - k);
+    st.O = { x: PX + 22 * Math.sin(Math.PI * k), y: PY + CH_CUT + lerp(48, 52, k) };
+    st.flail = Math.sin(t * 7) * .25 * (1 - k);
+  } else st.O = { ...O0 }, st.rot = 0;
+  // pumping haemolymph into the wings
+  const eRaw = seg(t, 61.8, 67.6);
+  st.e = easeInOutSine(eRaw) + .012 * Math.sin(2 * Math.PI * 1.3 * t) * Math.sin(Math.PI * eRaw);
+  st.abd = lerp(15, 8.5, easeInOutSine(seg(t, 62, 68)));
+  st.ant = easeInOutSine(seg(t, 61.6, 65.2));
+  st.zip = easeInOutSine(seg(t, 62.4, 66.2));
+  // imago: lift wings, open and close, fly
+  const lift = easeInOutSine(seg(t, 71.4, 72.8));
+  st.droopF = lerp(1.35, 0, lift); st.droopH = lerp(.8, 0, lift); st.o = lerp(.5, 1, lift);
+  if (t >= 72.8 && t < 75.6) st.o = .575 + .425 * Math.cos(2 * Math.PI * (t - 72.8) / 1.4);
+  if (t >= 75.6) {
+    const u = seg(t, 75.6, 78.6), f = 3.1, ph = 2 * Math.PI * f * (t - 75.6);
+    st.o = .14 + .86 * (.5 + .5 * Math.cos(ph));
+    const k = Math.pow(u, 1.35), P0 = O0, P1 = { x: PX + 70, y: PY + 300 }, P2 = { x: 780, y: 300 }, P3 = { x: 1190, y: 80 };
+    const b = (a, b2, c, d, s) => (1 - s) ** 3 * a + 3 * (1 - s) ** 2 * s * b2 + 3 * (1 - s) * s * s * c + s ** 3 * d;
+    const x = b(P0.x, P1.x, P2.x, P3.x, k), y = b(P0.y, P1.y, P2.y, P3.y, k);
+    const k2 = Math.min(1, k + .01), dx = b(P0.x, P1.x, P2.x, P3.x, k2) - x, dy = b(P0.y, P1.y, P2.y, P3.y, k2) - y;
+    const wob = 12 * Math.sin(2 * Math.PI * .9 * (t - 75.6)) * smoothstep(0, .2, u);
+    const L = Math.hypot(dx, dy) || 1;
+    st.O = { x: x - dy / L * wob, y: y + dx / L * wob - 6 * Math.sin(ph) * smoothstep(0, .1, u) };
+    st.rot = angLerp(0, Math.atan2(dy, dx) + Math.PI / 2, .75 * smoothstep(.02, .3, u));
+    st.sc = lerp(1, .74, u);
+    st.legsOp = 1 - smoothstep(0, .12, u);
+  }
+  return st;
+}
+function bfWorld(st, w, lx, ly) {
+  const def = WING_DEFS[w], sw = lerp(.5, 1, st.e), dr = w === 'fw' ? st.droopF : st.droopH;
+  let [x, y] = rot(lx * sw, ly * sw, dr); x += def.base[0]; y += def.base[1]; x *= st.o;
+  [x, y] = rot(x * st.sc, y * st.sc, st.rot);
+  return { x: st.O.x + x, y: st.O.y + y };
+}
+function renderButterfly(t) {
+  const st = bflyState(t);
+  show(BF.g, !!st);
+  if (!st) { S.wingPt = S.imagoPt = null; return; }
+  BF.g.setAttribute('transform', `translate(${F(st.O.x)} ${F(st.O.y)}) rotate(${F(st.rot * DEG)}) scale(${F(st.sc)})`);
+  const sw = lerp(.5, 1, st.e), ekey = F(st.e);
+  const morph = BF.lastE !== ekey; BF.lastE = ekey;
+  const col = st.e < .999 ? mixHex(PAL.deepOrange, PAL.orange, clamp(st.e * 1.2)) : PAL.orange;
+  const strs = {};
+  if (morph) for (const w of ['hw', 'fw']) { strs[w] = {}; for (const k in BF.tpl[w]) strs[w][k] = pathLerp(BF.tpl[w][k].cr, BF.tpl[w][k].exp, clamp(st.e)); }
+  for (const S2 of BF.sides) {
+    S2.g.setAttribute('transform', `scale(${F(S2.side * st.o)} 1)`);
+    for (const w of ['hw', 'fw']) {
+      const W = S2.wings[w], def = WING_DEFS[w], dr = w === 'fw' ? st.droopF : st.droopH;
+      W.g.setAttribute('transform', `translate(${def.base[0]} ${def.base[1]}) rotate(${F(dr * DEG)}) scale(${F(sw)})`);
+      if (morph) {
+        W.P.outline.setAttribute('d', strs[w].outline); W.P.orange.setAttribute('d', strs[w].orange); W.P.hatch.setAttribute('d', strs[w].orange);
+        W.P.veins.setAttribute('d', strs[w].veins); W.P.spots.setAttribute('d', strs[w].spots); W.P.ospots.setAttribute('d', strs[w].ospots);
+      }
+      setA(W.P.orange, 'fill', col);
+    }
+  }
+  setA(BF.abd, 'rx', F(st.abd));
+  setA(BF.abd, 'ry', F(lerp(41, 37, clamp((15 - st.abd) / 6.5))));
+  for (const L of BF.legs) {
+    L.p.setAttribute('transform', `rotate(${F(L.s * st.flail * DEG * (L.ry ? 1 : -.8))} ${L.s * L.rx} ${L.ry})`);
+    setA(L.p, 'opacity', F(st.legsOp));
+  }
+  // antennae straighten from a limp curl
+  for (let i = 0; i < 2; i++) {
+    const s = i ? 1 : -1; let x = s * 3, y = -34, a = -Math.PI / 2 + s * .3;
+    const pts = [[x, y]];
+    for (let k = 0; k < 8; k++) { a += s * (1 - st.ant) * (.17 + k * .03); x += Math.cos(a) * 7.4; y += Math.sin(a) * 7.4; pts.push([x, y]); }
+    BF.ant[i].setAttribute('d', smoothOpen(pts));
+    BF.club[i].setAttribute('transform', `translate(${F(x)} ${F(y)}) rotate(${F(a * DEG + 90)})`);
+  }
+  const sep = lerp(4.2, 0, st.zip);
+  BF.prob[0].setAttribute('transform', `translate(${F(-sep)} -39) scale(-1 1)`);
+  BF.prob[1].setAttribute('transform', `translate(${F(sep)} -39)`);
+  S.wingPt = bfWorld(st, 'fw', 95, -55);
+  S.imagoPt = { x: st.O.x + 12, y: st.O.y - 6 };
+}
+
+function renderTwigScene(t, day) {
+  const scene = $('twigScene');
+  const on = t >= 37.55;
+  show(scene, on);
+  if (!on) return;
+  setA(scene, 'opacity', F(seg(t, 37.6, 38.3) * (1 - seg(t, 78.9, 79.9))));
+  // silk pad and glinting strands
+  const w = easeInOutSine(seg(t, 39.3, 40.4));
+  setA(pad.ell, 'rx', F(16 * w)); setA(pad.ell, 'ry', F(4.5 * w));
+  pad.strands.forEach((p, i) => {
+    const glint = t < 40.6 ? Math.pow(Math.max(0, Math.sin(t * 5.3 + i * 1.9)), 3) : Math.pow(Math.max(0, Math.sin(t * .9 + i * 1.3)), 6);
+    setA(p, 'opacity', F(w * (.25 + .6 * glint)));
+  });
+  S.padPt = { x: PX + 8, y: PY + 3 };
+  // caterpillar → J → skin
+  const look = twigLarva(t);
+  show(twigRig.g, !!look);
+  if (look) {
+    drawRig(twigRig, twigPose, look);
+    const fall = seg(t, 47.2, 48.4);
+    if (fall > 0) {
+      const c = twigPose.C[Math.floor(NSEG / 2)];
+      twigRig.g.setAttribute('transform', `translate(0 ${F(820 * fall * fall)}) rotate(${F(fall * 160)} ${F(c.x)} ${F(c.y)})`);
+    } else setA(twigRig.g, 'transform', '');
+    const j = twigPose.C[7];
+    S.jPt = { x: j.x + Math.sin(j.a) * j.r, y: j.y - Math.cos(j.a) * j.r };
+  }
+  renderPupa(t);
+  renderButterfly(t);
+}
+
+/* =====================================================================
+   10. ANNOTATIONS — callouts
+   ===================================================================== */
+const CALLOUTS = [
+  { text: 'egg · 1.2 mm', t0: 5.9, t1: 10.8, off: [92, -118], anchor: () => S.eggAnchor },
+  ...INSTARS.map((I, k) => ({ text: I.name, t0: INSTAR_WIN[k][0], t1: INSTAR_WIN[k][1], off: k < 4 ? [80, -134] : [64, -150], anchor: () => S.headPt })),
+  { text: 'silk pad', t0: 39.5, t1: 42.4, off: [118, 92], anchor: () => S.padPt },
+  { text: 'J-hang', t0: 42.8, t1: 44.5, off: [128, 70], anchor: () => S.jPt },
+  { text: 'cremaster', t0: 46.9, t1: 50.6, off: [-132, 74], anchor: () => S.cremPt },
+  { text: 'chrysalis', t0: 50.4, t1: 54.4, off: [124, 66], anchor: () => S.chrysPt },
+  { text: 'wings expanding', t0: 62.4, t1: 67.9, off: [132, 58], anchor: () => S.wingPt },
+  { text: 'imago', t0: 70.5, t1: 72.9, off: [128, -60], anchor: () => S.imagoPt }
+];
+for (const c of CALLOUTS) {
+  c.g = el('g', { display: 'none' }, $('callouts'));
+  c.line = el('line', { stroke: PAL.ink, 'stroke-width': .6, 'stroke-linecap': 'round' }, c.g);
+  c.label = el('text', { 'font-size': 14, 'font-style': 'italic', fill: PAL.ink, 'fill-opacity': .85, 'text-anchor': c.off[0] < 0 ? 'end' : 'start' }, c.g);
+  c.label.textContent = c.text;
+}
+function renderCallouts(t) {
+  for (const c of CALLOUTS) {
+    const A = t >= c.t0 && t <= c.t1 ? c.anchor() : null;
+    show(c.g, !!A);
+    if (!A) continue;
+    const draw = easeInOutSine(seg(t, c.t0, c.t0 + .6)), txt = seg(t, c.t0 + .45, c.t0 + .95), out = 1 - seg(t, c.t1 - .5, c.t1);
+    const lx = clamp(A.x + c.off[0], c.off[0] < 0 ? 150 : 90, c.off[0] < 0 ? 910 : 836), ly = clamp(A.y + c.off[1], 72, 858);
+    const len = Math.hypot(lx - A.x, ly - A.y);
+    c.line.setAttribute('x1', F(A.x)); c.line.setAttribute('y1', F(A.y));
+    c.line.setAttribute('x2', F(lx)); c.line.setAttribute('y2', F(ly));
+    c.line.setAttribute('stroke-dasharray', F(len) + ' ' + F(len + 1));
+    c.line.setAttribute('stroke-dashoffset', F(len * (1 - draw)));
+    c.label.setAttribute('x', F(lx + (c.off[0] < 0 ? 6 : -6)));
+    c.label.setAttribute('y', F(ly + (c.off[1] > 0 ? 16 : -7)));
+    setA(c.label, 'opacity', F(txt));
+    setA(c.g, 'opacity', F(out));
+  }
+}
+
+/* =====================================================================
+   11. CAMERA, OPENING, FOOTER / HUD
+   ===================================================================== */
+function renderCamera(t) {
+  let fx = FC.x, fy = FC.y, s = 1;
+  if (t < 37.6) {
+    const push = easeInOutSine(seg(t, 5.6, 13.2)) * (1 - easeInOutSine(seg(t, 13.4, 15.4)));
+    const eg = eggToWorld(0, -EGG_H / 2);
+    fx = lerp(FC.x, eg[0], .32 * push); fy = lerp(FC.y, eg[1], .32 * push); s = 1 + .08 * push;
+    if (t > 14 && S.headPt) fx += (S.headPt.x - 500) * .05 * smoothstep(14.5, 16.5, t);
+    fx += 40 * easeInOutSine(seg(t, 36, 37.6));
+  } else {
+    const a = easeInOutSine(seg(t, 38, 56)), b = easeInOutSine(seg(t, 56, 61)), c = easeInOutSine(seg(t, 70.5, 76));
+    fy = lerp(430, 330, a); s = 1 + .06 * a;
+    fy = lerp(fy, 420, b); s = lerp(s, 1.03, b);
+    fy = lerp(fy, FC.y, c); s = lerp(s, 1, c);
+  }
+  setA($('cam'), 'transform', `translate(${FC.x} ${FC.y}) scale(${F(s * 1000) / 1000}) translate(${F(-fx)} ${F(-fy)})`);
+}
+
+function renderOpening(t) {
+  const card = $('titleCard');
+  const op = seg(t, .3, 1.5) * (1 - seg(t, 3.0, 3.9));
+  setA(card, 'opacity', F(op));
+  show(card, op > 0);
+  setA($('titleRule'), 'stroke-dashoffset', F(180 * (1 - easeInOutSine(seg(t, .9, 2.0)))));
+}
+
+function renderLight(t, day) {
+  const f = day - Math.floor(day), light = .5 + .5 * Math.cos(2 * Math.PI * f);
+  const ticking = t >= 4 && t < 58;
+  setA($('dayLight'), 'opacity', F(ticking ? .13 * light : .07));
+  setA($('dayDark'), 'opacity', F(ticking ? .07 * (1 - light) : 0));
+}
+
+function setTitle(numEl, titEl, c) {
+  const n = c >= 0 ? CHAPTERS[c].numeral + '.' : '', ti = c >= 0 ? CHAPTERS[c].title : '';
+  if (numEl.textContent !== n) numEl.textContent = n;
+  if (titEl.textContent !== ti) titEl.textContent = ti;
+}
+function renderFooter(t, day) {
+  const c = chapterIndex(t);
+  const dt = c >= 0 ? t - CHAPTERS[c].start : t;
+  const k = seg(dt, 0, .4), endFade = 1 - seg(t, 79.6, 80);
+  setTitle($('numA'), $('titA'), c);
+  setTitle($('numB'), $('titB'), c - 1);
+  const a = F(k * endFade), b = F((1 - k) * (c >= 1 ? 1 : 0));
+  for (const id of ['numA', 'titA']) setA($(id), 'opacity', a);
+  for (const id of ['numB', 'titB']) setA($(id), 'opacity', b);
+  setA($('ring'), 'stroke-dashoffset', F(56.55 * (1 - t / TOTAL)));
+  const dtxt = 'day ' + Math.floor(day + 1e-6);
+  if ($('dayT').textContent !== dtxt) $('dayT').textContent = dtxt;
+  setA($('dayG'), 'opacity', F(Math.min(seg(t, 0, .7), 1 - seg(t, 79.3, 80))));
+  const x = F(48 + 904 * t / TOTAL);
+  setA($('scrubFill'), 'x2', x); setA($('scrubKnob'), 'cx', x);
+  setA($('pausedT'), 'opacity', playing ? '0' : '0.8');
+}
+
+/* =====================================================================
+   12. RENDER — the whole frame as a pure function of t
+   ===================================================================== */
+function render(t) {
+  const day = dayAt(t);
+  S.t = t;
+  S.eggAnchor = S.headPt = S.padPt = S.jPt = S.cremPt = S.chrysPt = S.wingPt = S.imagoPt = null;
+  renderLight(t, day);
+  renderOpening(t);
+  renderLeafScene(t, day);
+  renderTwigScene(t, day);
+  renderCamera(t);
+  renderCallouts(t);
+  renderFooter(t, day);
+}
+
+/* =====================================================================
+   13. CONTROLS — play/pause, chapters, speed, scrubber, chapter menu
+   ===================================================================== */
+let T = 0, playing = true, speed = 1, dragging = false, lastNow = null, dirty = true;
+
+(function buildScrubAndMenu() {
+  for (const C of CHAPTERS) {
+    const x = F(48 + 904 * C.start / TOTAL);
+    el('line', { x1: x, x2: x, y1: 956.5, y2: 963.5 }, $('scrubTicks'));
+  }
+  CHAPTERS.forEach((C, i) => {
+    const g = el('g', { class: 'mi ui' }, $('menuItems'));
+    el('rect', { x: 50, y: 742 + i * 26, width: 202, height: 24, fill: 'transparent' }, g);
+    const n = el('text', { x: 62, y: 759 + i * 26, 'font-size': 13 }, g); n.textContent = C.numeral + '.';
+    const ti = el('text', { x: 100, y: 759 + i * 26, 'font-size': 15, 'font-style': 'italic' }, g); ti.textContent = C.title;
+    g.addEventListener('click', e => { e.stopPropagation(); jump(C.start + .001); toggleMenu(false); });
+  });
+})();
+
+function jump(t) { T = ((t % TOTAL) + TOTAL) % TOTAL; dirty = true; }
+function toggleMenu(on) { show($('menu'), on == null ? $('menu').getAttribute('display') === 'none' : on); }
+function stepChapter(dir) {
+  const c = chapterIndex(T);
+  if (dir > 0) jump(c + 1 < CHAPTERS.length ? CHAPTERS[c + 1].start + .001 : 0);
+  else {
+    if (c < 0) { jump(CHAPTERS[CHAPTERS.length - 1].start + .001); return; }
+    if (T - CHAPTERS[c].start > 1.5) jump(CHAPTERS[c].start + .001);
+    else jump(c > 0 ? CHAPTERS[c - 1].start + .001 : 0);
+  }
+}
+
+$('chapBtn').addEventListener('click', e => { e.stopPropagation(); toggleMenu(); });
+document.addEventListener('click', () => toggleMenu(false));
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); playing = !playing; dirty = true; }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); stepChapter(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); stepChapter(-1); }
+  else if (e.key === '1') speed = .5;
+  else if (e.key === '2') speed = 1;
+  else if (e.key === '3') speed = 2;
+  else if (e.key === 'Escape') toggleMenu(false);
+});
+
+const scrub = $('scrub');
+function scrubTo(ev) {
+  const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  jump(clamp((p.x - 48) / 904, 0, .99999) * TOTAL);
+}
+scrub.addEventListener('pointerdown', e => { dragging = true; scrub.classList.add('drag'); scrub.setPointerCapture(e.pointerId); scrubTo(e); e.stopPropagation(); });
+scrub.addEventListener('pointermove', e => { if (dragging) scrubTo(e); });
+const endDrag = () => { dragging = false; scrub.classList.remove('drag'); };
+scrub.addEventListener('pointerup', endDrag);
+scrub.addEventListener('pointercancel', endDrag);
+scrub.addEventListener('click', e => e.stopPropagation());
+
+/* reduced motion: hold still on plate II with every annotation showing */
+if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { playing = false; T = 25.4; }
+/* optional deep link, e.g. index.html?t=62 or ?t=62&paused */
+(function () {
+  const q = new URLSearchParams(location.search);
+  if (q.has('t')) { const v = parseFloat(q.get('t')); if (isFinite(v)) T = ((v % TOTAL) + TOTAL) % TOTAL; }
+  if (q.has('paused')) playing = false;
+})();
+
+function frame(now) {
+  if (lastNow === null) lastNow = now;
+  const dt = Math.min(.1, (now - lastNow) / 1000); lastNow = now;
+  if (playing && !dragging) { T = (T + dt * speed) % TOTAL; dirty = true; }
+  if (dirty) { render(T); dirty = false; }
+  requestAnimationFrame(frame);
+}
+render(T);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
