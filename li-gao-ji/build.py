@@ -1,72 +1,138 @@
-"""李高记 logo generator: writes the SVG marks and a showcase page.
+"""李高记 logo generator: writes the emblem SVGs and a showcase page.
 
-The three characters share strokes and together draw one noodle bowl:
-  - the bowl rim is a single stroke that is 李's 木横, 高's 亠横 and 己's 横折;
-  - the bowl body is a single stroke that is 李's 子竖钩 on the left and
-    记's 竖弯钩 on the right, so 己 hooks up to close the bowl;
-  - 高's dot is a green pea (豌杂面), 讠's dot is a chili (重庆小面),
-    and 李's 木竖 pokes above the rim like a chopstick.
+Each character keeps its skeleton, but its parts are swapped for pictures:
+  李  木竖 → a pair of red chopsticks; 撇/点 → noodles hanging off them;
+      子's 竖钩 → a noodle curl.
+  高  dot → a green pea on the roof ridge; 亠 → an upturned Chongqing eave;
+      top 口 → the red shop plaque; 冂 → the shop door; inner 口 → a bowl of
+      noodles in red chili soup, with steam.
+  记  讠's dot → a chili; 己 → one long pulled noodle.
+Noodle strokes are drawn as golden strands; everything structural is solid.
+A ribbon underneath carries 豌杂面 · 重庆小面.
 """
 from pathlib import Path
 
 OUT = Path(__file__).parent
 
 INK = "#2B1B14"
-CHILI = "#D2371F"
+CHILI = "#CE3620"
+CHILI_DK = "#A02A17"
 PEA = "#7FA83A"
 CREAM = "#F5ECD8"
+NOODLE = "#EDBE4E"
 
-SW = 20  # stroke width; the mark spans x 0..720, y 30..424
-
-STROKES = [
-    # shared: rim = 木横 + 亠横 + 己横折
-    "M0 110 H720 V205 H574",
-    # shared: bowl body = 子竖钩 ... 己竖弯钩
-    "M2 262 C6 340 64 376 150 376 H570 C656 376 714 340 718 262",
-    # bowl foot
-    "M300 414 H420",
-    # 李
-    "M130 36 V206",
-    "M122 124 Q100 170 42 196",
-    "M138 124 Q160 170 218 196",
-    "M58 232 H198 L138 264",
-    "M40 300 H228",
-    "M138 264 V376",
-    # 高
-    "M300 150 H420 V190 H300 Z",
-    "M264 336 V224 H454 V322 Q454 336 440 336",
-    "M308 254 H410 V302 H308 Z",
-    # 讠
-    "M484 160 H514 V304 L538 284",
-    # 己竖
-    "M574 205 V376",
-]
+FONTS = ("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@900"
+         "&family=Jost:wght@500&display=swap")
+CN = "font-family:'Noto Serif SC',serif;font-weight:900"
+EN = "font-family:'Jost',sans-serif;font-weight:500"
 
 
-def chili(x, y, s=1.0, rot=-28, fill=CHILI, stem=PEA):
-    body = ("M0,-22 C13,-22 17,-10 15,4 C13,19 4,32 -10,40 "
-            "C-6,28 -6,14 -9,2 C-11,-10 -9,-22 0,-22 Z")
-    stem_d = "M0,-22 C0,-30 4,-34 10,-36"
+class Pen:
+    def __init__(self, ink, edge):
+        self.ink, self.edge, self.out = ink, edge, []
+
+    def solid(self, d, w=26, c=None):
+        self.out.append(f'<path d="{d}" fill="none" stroke="{c or self.ink}" '
+                        f'stroke-width="{w}" stroke-linecap="round" stroke-linejoin="round"/>')
+
+    def noodle(self, d, w=30):
+        # outline, golden body, centre groove → reads as a pair of strands
+        for sw, c in ((w, self.edge), (w - 10, NOODLE), (4, self.edge)):
+            self.solid(d, sw, c)
+
+    def fill(self, d, c=None):
+        self.out.append(f'<path d="{d}" fill="{c or self.ink}"/>')
+
+    def raw(self, s):
+        self.out.append(s)
+
+
+def chili(x, y, s, rot=-24):
     return (f'<g transform="translate({x} {y}) rotate({rot}) scale({s})">'
-            f'<path d="{body}" fill="{fill}"/>'
-            f'<path d="{stem_d}" fill="none" stroke="{stem}" stroke-width="6" '
-            f'stroke-linecap="round"/></g>')
+            f'<path d="M0,-22 C13,-22 17,-10 15,4 C13,19 4,32 -10,40 C-6,28 -6,14 -9,2 '
+            f'C-11,-10 -9,-22 0,-22 Z" fill="{CHILI}"/>'
+            f'<path d="M3,-17 C8,-15 10,-8 9,-1" fill="none" stroke="rgba(255,255,255,.35)" '
+            f'stroke-width="3" stroke-linecap="round"/>'
+            f'<path d="M0,-22 C0,-30 4,-34 10,-36" fill="none" stroke="{PEA}" '
+            f'stroke-width="6" stroke-linecap="round"/></g>')
 
 
-def pea(x, y, r, fill=PEA):
-    return (f'<circle cx="{x}" cy="{y}" r="{r}" fill="{fill}"/>'
-            f'<circle cx="{x - r * .35}" cy="{y - r * .35}" r="{r * .28}" '
-            f'fill="rgba(255,255,255,.45)"/>')
+def pea(x, y, r):
+    return (f'<circle cx="{x}" cy="{y}" r="{r}" fill="{PEA}"/>'
+            f'<circle cx="{x - r * .35}" cy="{y - r * .35}" r="{r * .3}" '
+            f'fill="rgba(255,255,255,.5)"/>')
 
 
-def mark(ink=INK, pea_c=PEA, chili_c=CHILI, stem_c=PEA):
-    paths = "".join(f'<path d="{d}"/>' for d in STROKES)
-    return (f'<g fill="none" stroke="{ink}" stroke-width="{SW}" '
-            f'stroke-linecap="round" stroke-linejoin="round">{paths}</g>'
-            + pea(360, 72, 18, pea_c) + chili(500, 52, 1.05, fill=chili_c, stem=stem_c))
+def gao(p):
+    """高 as a noodle shop front. Occupies x 332..668, y 60..540."""
+    p.raw(pea(500, 80, 22))                                        # 点 → 豌豆
+    p.fill("M440 104 H560 L584 150 H416 Z")                         # 屋脊
+    p.fill("M332 132 Q362 152 408 150 L592 150 Q638 152 668 132 "
+           "Q664 162 640 176 L360 176 Q336 162 332 132 Z")          # 亠 → 飞檐
+    p.solid("M452 176 V198 M548 176 V198", 8)                       # 挂绳
+    p.fill("M424 198 H576 V256 H424 Z", CHILI)                      # 口 → 招牌
+    p.solid("M424 198 H576 V256 H424 Z", 12)
+    p.solid("M372 540 V288 H628 V520 Q628 540 606 540")             # 冂 → 店门
+    p.solid("M350 288 H650")
+    for x in (468, 500, 532):                                       # 热气
+        p.solid(f"M{x} 382 C{x - 14} 366 {x + 14} 352 {x} 336", 7)
+    bowl = "M420 400 H580 C580 452 546 480 500 480 C454 480 420 452 420 400 Z"
+    p.fill(bowl, CHILI)                                             # 内口 → 面碗
+    p.noodle("M440 404 C460 388 480 420 500 404 C520 388 540 420 560 404", 18)
+    p.solid(bowl, 14)
+    p.solid("M470 504 H530", 14)
 
 
-MARK_W, MARK_H, MARK_TOP = 720, 394, 30   # visual bounds of mark()
+def li(p):
+    """李: chopsticks lifting noodles over 子. Occupies x 60..320."""
+    p.solid("M72 250 H308")                                         # 木横
+    p.fill("M174 136 L186 136 L192 376 L186 376 Z", CHILI)          # 木竖 → 筷子
+    p.fill("M200 136 L212 136 L200 376 L194 376 Z", CHILI)
+    p.noodle("M188 266 C162 310 120 336 78 350")                    # 撇 → 面
+    p.noodle("M196 266 C222 310 264 336 306 350")                   # 点 → 面
+    p.solid("M96 404 H262 L196 442")                                # 乛
+    p.solid("M66 476 H314")                                         # 横
+    p.noodle("M196 442 V508 C196 542 176 548 150 538")              # 竖钩 → 面尾
+
+
+def ji(p):
+    """记: chili for the dot, one long noodle for 己. Occupies x 680..945."""
+    p.raw(chili(724, 236, 1.5))                                     # 点 → 辣椒
+    p.solid("M694 326 H732 V500 L764 474")                          # 讠
+    p.noodle("M800 250 H924 V368 H812 V490 C812 530 830 536 860 536 "
+             "H904 C934 536 940 520 940 490 V462", 32)              # 己 → 一根面
+
+
+def ribbon(y=572, text_c=CREAM):
+    return "".join([
+        f'<path d="M40 {y + 28} L90 {y + 8} V{y + 80} L40 {y + 100} L62 {y + 64} Z" fill="{CHILI_DK}"/>',
+        f'<path d="M960 {y + 28} L910 {y + 8} V{y + 80} L960 {y + 100} L938 {y + 64} Z" fill="{CHILI_DK}"/>',
+        f'<rect x="90" y="{y}" width="820" height="72" fill="{CHILI}"/>',
+        f'<text x="500" y="{y + 50}" text-anchor="middle" fill="{text_c}" '
+        f'style="{CN};font-size:36px;letter-spacing:18px">豌杂面 · 重庆小面</text>',
+    ])
+
+
+EW, EH = 1000, 690   # emblem box
+
+
+def emblem(ink=INK, bg=CREAM, halo="#EBDDBD", with_ribbon=True):
+    p = Pen(ink, INK if ink == INK else bg)
+    p.raw(f'<circle cx="500" cy="330" r="300" fill="{halo}"/>')
+    li(p); gao(p); ji(p)
+    if with_ribbon:
+        p.raw(ribbon())
+    return "".join(p.out)
+
+
+def icon(r=300):
+    """Round avatar: the 高 shop front alone."""
+    p = Pen(CREAM, INK)
+    gao(p)
+    s = 0.8
+    return (f'<circle cx="{r}" cy="{r}" r="{r}" fill="{INK}"/>'
+            f'<circle cx="{r}" cy="{r}" r="{r - 18}" fill="none" stroke="{CHILI}" stroke-width="6"/>'
+            f'<g transform="translate({r - 500 * s} {r - 300 * s}) scale({s})">{"".join(p.out)}</g>')
 
 
 def place(body, x, y, s=1.0):
@@ -79,90 +145,36 @@ def svg(w, h, body, bg=None):
             f'width="{w}" height="{h}">{rect}{body}</svg>')
 
 
-FONTS = ("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700;900"
-         "&family=Jost:wght@400;500&display=swap")
-CN = "font-family:'Noto Serif SC',serif;font-weight:900"
-EN = "font-family:'Jost',sans-serif;font-weight:500"
-
-
-def lockup(ink=INK, sub=INK, accent=CHILI, **kw):
-    """Mark + tagline stacked. Returns (body, w, h)."""
-    w = MARK_W
-    y = MARK_H + MARK_TOP + 56
-    body = [place(mark(ink, **kw), 0, -MARK_TOP),
-            f'<text x="{w / 2}" y="{y + 16}" text-anchor="middle" fill="{sub}" '
-            f'style="{CN};font-size:44px;letter-spacing:18px">豌杂面<tspan fill="{accent}"> · </tspan>重庆小面</text>',
-            f'<text x="{w / 2}" y="{y + 70}" text-anchor="middle" fill="{sub}" '
-            f'opacity=".65" style="{EN};font-size:20px;letter-spacing:12px">'
-            f'LI GAO JI NOODLE HOUSE</text>']
-    return "".join(body), w, y + 76
-
-
-def badge(r=300, bg=CHILI, fg=CREAM):
-    """Round emblem: mark in the middle, tagline running round the ring."""
-    c = r
-    s = 0.6
-    mw, mh = MARK_W * s, MARK_H * s
-    rt = r - 52  # text radius
-    top = f"M{c - rt} {c} A{rt} {rt} 0 0 1 {c + rt} {c}"
-    bot = f"M{c - rt - 22} {c} A{rt + 22} {rt + 22} 0 0 0 {c + rt + 22} {c}"
-    return "".join([
-        f'<circle cx="{c}" cy="{c}" r="{r}" fill="{bg}"/>',
-        f'<circle cx="{c}" cy="{c}" r="{r - 16}" fill="none" stroke="{fg}" stroke-width="3"/>',
-        f'<defs><path id="arcT" d="{top}"/><path id="arcB" d="{bot}"/></defs>',
-        f'<text fill="{fg}" style="{CN};font-size:38px;letter-spacing:10px">'
-        f'<textPath href="#arcT" startOffset="50%" text-anchor="middle">豌杂面 · 重庆小面</textPath></text>',
-        f'<text fill="{fg}" style="{EN};font-size:20px;letter-spacing:10px">'
-        f'<textPath href="#arcB" startOffset="50%" text-anchor="middle">LI GAO JI · NOODLE HOUSE</textPath></text>',
-        f'<circle cx="{c - rt - 8}" cy="{c + 4}" r="5" fill="{fg}"/>',
-        f'<circle cx="{c + rt + 8}" cy="{c + 4}" r="5" fill="{fg}"/>',
-        place(mark(fg, pea_c="#A6CF55", chili_c=INK, stem_c="#A6CF55"),
-              c - mw / 2, c - mh / 2 - MARK_TOP * s + 6, s),
-    ])
-
-
 def label(x, y, text, color=INK, op=".55"):
     return (f'<text x="{x}" y="{y}" fill="{color}" opacity="{op}" '
             f'style="{EN};font-size:17px;letter-spacing:6px">{text}</text>')
 
 
 def sheet():
-    W_, H_ = 1600, 2000
-    p = []
-    # 1 — primary logo on cream
-    p.append(f'<rect width="{W_}" height="960" fill="{CREAM}"/>')
-    lk, lw, lh = lockup()
-    s = 1.12
-    p.append(place(lk, (W_ - lw * s) / 2, (960 - lh * s) / 2 + 10, s))
-    p.append(label(80, 90, "PRIMARY LOGO · 主标志"))
-    # 2 — storefront (dark) + badge on cream
-    y2 = 960
-    p.append(f'<rect y="{y2}" width="1000" height="620" fill="{INK}"/>')
-    dk, dw, dh = lockup(CREAM, CREAM)
+    W_, H_ = 1600, 2040
+    p = [f'<rect width="{W_}" height="1080" fill="{CREAM}"/>',
+         label(80, 90, "PRIMARY LOGO · 主标志")]
+    s = 1.3
+    p.append(place(emblem(), (W_ - EW * s) / 2, 110, s))
+    y2 = 1080
+    p.append(f'<rect y="{y2}" width="1000" height="600" fill="{INK}"/>')
+    p.append(label(80, y2 + 76, "STOREFRONT · 门头", CREAM, ".5"))
     s2 = 0.72
-    p.append(place(dk, (1000 - dw * s2) / 2, y2 + (620 - dh * s2) / 2 + 30, s2))
-    p.append(label(80, y2 + 80, "STOREFRONT · 门头", CREAM, ".5"))
-    p.append(f'<rect x="1000" y="{y2}" width="600" height="620" fill="#EFE3C8"/>')
-    p.append(place(badge(), 1300 - 300 * .8, y2 + 310 - 300 * .8 + 20, .8))
-    p.append(label(1060, y2 + 80, "BADGE · 圆标"))
-    # 3 — small sizes + palette
-    y3 = y2 + 620
+    p.append(place(emblem(CREAM, INK, "#3A2A21"), (1000 - EW * s2) / 2, y2 + 70, s2))
+    p.append(f'<rect x="1000" y="{y2}" width="600" height="600" fill="#EFE3C8"/>')
+    p.append(label(1060, y2 + 76, "ICON · 头像"))
+    p.append(place(icon(), 1300 - 210, y2 + 330 - 210, .7))
+    y3 = y2 + 600
     p.append(f'<rect y="{y3}" width="{W_}" height="{H_ - y3}" fill="{CREAM}"/>')
-    p.append(label(80, y3 + 70, "SMALL SIZES · 小尺寸"))
-    x = 80
-    for sc in (.36, .22, .12):
-        p.append(place(mark(), x, y3 + 130 + (1 - sc) * 60 - MARK_TOP * sc, sc))
-        x += MARK_W * sc + 60
-    p.append(label(1000, y3 + 70, "PALETTE · 色彩"))
-    for k, (c, name, hexv) in enumerate([(INK, "酱色", INK), (CHILI, "红油", CHILI),
-                                         (PEA, "豌豆", PEA), (CREAM, "面白", CREAM)]):
-        xx = 1000 + k * 135
-        p.append(f'<rect x="{xx}" y="{y3 + 115}" width="110" height="110" rx="55" '
-                 f'fill="{c}" stroke="rgba(43,27,20,.2)"/>')
-        p.append(f'<text x="{xx + 55}" y="{y3 + 262}" text-anchor="middle" fill="{INK}" '
-                 f'style="{CN};font-size:20px">{name}</text>')
-        p.append(f'<text x="{xx + 55}" y="{y3 + 290}" text-anchor="middle" fill="{INK}" '
-                 f'opacity=".55" style="{EN};font-size:14px">{hexv}</text>')
+    p.append(label(80, y3 + 70, "PALETTE · 色彩"))
+    for k, (c, name) in enumerate([(INK, "酱色"), (CHILI, "红油"), (NOODLE, "面黄"),
+                                   (PEA, "豌豆"), (CREAM, "面白")]):
+        x = 80 + k * 300
+        p.append(f'<rect x="{x}" y="{y3 + 110}" width="250" height="120" rx="16" '
+                 f'fill="{c}" stroke="rgba(43,27,20,.18)"/>')
+        p.append(f'<text x="{x}" y="{y3 + 272}" fill="{INK}" style="{CN};font-size:22px">{name}</text>')
+        p.append(f'<text x="{x + 250}" y="{y3 + 272}" text-anchor="end" fill="{INK}" '
+                 f'opacity=".55" style="{EN};font-size:16px">{c}</text>')
     return svg(W_, H_, "".join(p))
 
 
@@ -174,17 +186,12 @@ def page(inner, bg=CREAM):
 
 
 if __name__ == "__main__":
-    pad = 70
-    # pure vector mark (no fonts needed)
-    (OUT / "mark.svg").write_text(svg(MARK_W + 2 * pad, MARK_H + 2 * pad,
-        place(mark(), pad, pad - MARK_TOP)))
-    (OUT / "mark-dark.svg").write_text(svg(MARK_W + 2 * pad, MARK_H + 2 * pad,
-        place(mark(CREAM), pad, pad - MARK_TOP), INK))
-    lk, lw, lh = lockup()
-    (OUT / "logo.html").write_text(page(svg(lw + 240, lh + 200,
-        place(lk, 120, 100), CREAM)))
-    dk, dw, dh = lockup(CREAM, CREAM)
-    (OUT / "logo-dark.html").write_text(page(svg(dw + 240, dh + 200,
-        place(dk, 120, 100), INK), INK))
-    (OUT / "badge.html").write_text(page(svg(640, 640, place(badge(), 20, 20))))
+    pad = 50
+    # vector emblem without the ribbon text, so it needs no fonts
+    (OUT / "mark.svg").write_text(svg(EW, 600, emblem(with_ribbon=False), CREAM))
+    (OUT / "icon.svg").write_text(svg(600, 600, icon()))
+    (OUT / "logo.html").write_text(page(svg(EW + 2 * pad, EH + 2 * pad,
+        place(emblem(), pad, pad), CREAM)))
+    (OUT / "logo-dark.html").write_text(page(svg(EW + 2 * pad, EH + 2 * pad,
+        place(emblem(CREAM, INK, "#3A2A21"), pad, pad), INK), INK))
     (OUT / "sheet.html").write_text(page(sheet()))
