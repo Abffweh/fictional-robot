@@ -529,10 +529,10 @@ SETS.board = (()=>{
   for (const sx of [-4.5, 4.5]){ const leg = box(.3, 1.4, .3, '#6b4a30'); leg.position.set(sx, .7, 0); g.add(leg); }
   const chalk = (txt, font, h) => canvasTex(2048, h, (c,w,hh)=>{ c.fillStyle = '#F1E6CF'; c.font = font; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, w/2, hh/2); });
   const rows = [
-    [chalk('为什么会这样？', `900 120px ${SERIF}`, 300), 1.6, 5.9],
-    [chalk('人缘好的人，会出现在很多人的朋友名单里', `500 80px ${SERIF}`, 160), .86, 4.75],
-    [chalk('所以你数到的朋友，总是偏受欢迎的那几个', `700 86px ${SERIF}`, 280), 1.5, 3.65],
-    [chalk('只要每个人的朋友数不一样多，就一定会这样', `500 70px ${SERIF}`, 160), .86, 2.55],
+    [chalk('朋友的平均朋友数  =  μ  +  σ² / μ', `900 112px ${SERIF}`, 300), 1.6, 5.9],
+    [chalk('μ：大家平均有几个朋友        σ²：每个人的朋友数差得有多大', `500 64px ${SERIF}`, 160), .86, 4.75],
+    [chalk(`${G8.mu}  +  ${G8.sigma2} ÷ ${G8.mu}  =  ${G8.fof.toFixed(1)}`, `700 140px ${GAR}`, 280), 1.5, 3.65],
+    [chalk('只要大家的朋友有多有少，算出来就一定比平均数大', `500 66px ${SERIF}`, 160), .86, 2.55],
   ].map(([tex, hh, y]) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 10.4 * tex.image.height / 2048), new THREE.MeshBasicMaterial({map: tex, transparent: true}));
     m.position.set(0, y, .2); g.add(m); return m; });
   rows[2].material.color.set('#F0C987');
@@ -666,9 +666,9 @@ const SUBS = [
   [49.7, 52.9, '朋友越多的人，就越容易出现在<em>你的朋友名单</em>里。'],
   [52.9, 55.4, '所以，大家平均只有<em>2.5</em>个朋友，'],
   [55.4, 57.9, '可大家的朋友，平均却有<red>3.2</red>个。'],
-  [58.1, 61.0, '为什么会这样？说白了很简单：'],
-  [61.0, 64.0, '人缘好的人，会出现在<em>很多人</em>的朋友名单里；'],
-  [64.0, 67.0, '所以你数朋友时，数到的总是<em>偏受欢迎</em>的人。'],
+  [58.1, 61.0, '这背后有个公式，意思其实很简单：'],
+  [61.0, 64.0, 'μ 是大家平均的朋友数，σ² 是大家的朋友数<em>差得多不多</em>；'],
+  [64.0, 67.0, '只要朋友数有多有少，朋友的平均就一定<em>比 μ 大</em>。'],
   [67.0, 70.5, '换成一千个人，结果也一样：'],
   [70.5, 74.4, `有<red>${BA_PCT}%</red>的人，都发现朋友比自己受欢迎。`],
   [74.5, 77.8, '2011年，有人统计了7亿多 Facebook 用户，'],
