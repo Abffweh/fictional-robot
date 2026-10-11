@@ -32,7 +32,7 @@
   #corner .a { font: italic 500 54px 'EB Garamond', serif; }
   #corner .a::after { content: ''; display: block; height: 3px; width: 140px; margin: 6px 0 0 auto; background: #C8463A; }
   #corner .b { font: 500 36px 'Noto Serif SC'; letter-spacing: 6px; margin-top: 12px; }
-  #subtitle { left: 0; right: 0; top: 960px; text-align: center; font: 900 66px 'Noto Serif SC'; letter-spacing: 3px; }
+  #subtitle { left: 0; right: 0; top: 962px; text-align: center; font: 900 60px 'Noto Serif SC'; letter-spacing: 2px; }
   #subtitle .ch { display: inline-block; }
   #subtitle .em { color: #F0C987; }
   #subtitle .red { color: #E8735F; text-decoration: underline; text-underline-offset: 10px; text-decoration-thickness: 3px; }
@@ -50,6 +50,8 @@
   #check .row { position: relative; }
   .lab::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: 30px; background: rgba(243,232,207,.75); }
   .lab { margin-top: -30px; }
+  .lab.lft { transform: translate(-100%, -100%); } .lab.lft::after { left: 100%; }
+  .lab.rgt { transform: translate(0, -100%); } .lab.rgt::after { left: 0; }
   #title .refs { font: italic 500 30px 'EB Garamond', serif; color: rgba(243,232,207,.85); text-align: center; line-height: 1.7; margin-top: 18px; }
   #title .note { font: 500 26px 'Noto Serif SC'; color: rgba(243,232,207,.6); margin-top: 18px; }
   #hook { position: absolute; left: 0; right: 0; z-index: 25; text-align: center; font-family: 'Noto Serif SC', serif; color: #F6ECD6; pointer-events: none;
@@ -399,7 +401,7 @@ function cardTex(lines, o={}){   // 米白纸卡：lines = [[text, font, color],
 function markTex(text, kind){
   return canvasTex(560, 200, (g,w,h)=>{
     g.fillStyle = '#F1E6CF'; rr(g, 8, 8, w-16, h-16, 24); g.fill();
-    g.font = `700 70px ${SERIF}`; g.fillStyle = '#3A2614'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(text, 40, h/2+4);
+    g.font = `700 60px ${SERIF}`; g.fillStyle = '#3A2614'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(text, 36, h/2+4);
     g.lineWidth = 12; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath();
     const x = w-90, y = h/2;
     if (kind === 'ok'){ g.strokeStyle = '#B88A2E'; g.moveTo(x-30,y); g.lineTo(x-8,y+24); g.lineTo(x+32,y-26); }
@@ -480,7 +482,7 @@ SETS.net = (()=>{
     const card = new THREE.Mesh(new THREE.BoxGeometry(.85, .66, .04), [clay('#e9dcc0'),clay('#e9dcc0'),clay('#e9dcc0'),clay('#e9dcc0'), new THREE.MeshStandardMaterial({map: tex, roughness: .9}), clay('#e9dcc0')]);
     card.position.set(-.48, 2.4, 0); card.castShadow = true; f.add(card);
     f.position.set(p.x + .55, Y, p.z - .45); g.add(f); return f; });
-  const marks = P.map((p,i) => { const s = sprite(markTex(`朋友均值 ${G8.favg[i]}`, G8.kind[i]), 2.1, .75); g.add(s); return s; });
+  const marks = P.map((p,i) => { const s = sprite(markTex(`朋友平均${G8.favg[i]}个`, G8.kind[i]), 2.1, .75); g.add(s); return s; });
   const lists = P.map((p,i) => { if (i === 7) return null;
     const names = G8.nb[i].map(j => G8.names[j]);
     const tex = canvasTex(400, 120 + names.length*90, (c,w,h)=>{ c.fillStyle = '#F1E6CF'; rr(c, 6, 6, w-12, h-12, 18); c.fill();
@@ -527,10 +529,10 @@ SETS.board = (()=>{
   for (const sx of [-4.5, 4.5]){ const leg = box(.3, 1.4, .3, '#6b4a30'); leg.position.set(sx, .7, 0); g.add(leg); }
   const chalk = (txt, font, h) => canvasTex(2048, h, (c,w,hh)=>{ c.fillStyle = '#F1E6CF'; c.font = font; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, w/2, hh/2); });
   const rows = [
-    [chalk('朋友的平均朋友数  =  μ  +  σ² / μ', `900 118px ${SERIF}`, 300), 1.6, 5.9],
-    [chalk('μ：平均朋友数        σ²：人和人之间的差异（方差）', `500 74px ${SERIF}`, 160), .86, 4.75],
-    [chalk(`${G8.mu}  +  ${G8.sigma2} ÷ ${G8.mu}  =  ${G8.fof.toFixed(1)}`, `700 140px ${GAR}`, 280), 1.5, 3.65],
-    [chalk('只要 σ² > 0，右边一定比 μ 大', `500 84px ${SERIF}`, 160), .86, 2.55],
+    [chalk('为什么会这样？', `900 120px ${SERIF}`, 300), 1.6, 5.9],
+    [chalk('人缘好的人，会出现在很多人的朋友名单里', `500 80px ${SERIF}`, 160), .86, 4.75],
+    [chalk('所以你数到的朋友，总是偏受欢迎的那几个', `700 86px ${SERIF}`, 280), 1.5, 3.65],
+    [chalk('只要每个人的朋友数不一样多，就一定会这样', `500 70px ${SERIF}`, 160), .86, 2.55],
   ].map(([tex, hh, y]) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 10.4 * tex.image.height / 2048), new THREE.MeshBasicMaterial({map: tex, transparent: true}));
     m.position.set(0, y, .2); g.add(m); return m; });
   rows[2].material.color.set('#F0C987');
@@ -638,37 +640,47 @@ const THOUGHTS = [];
 Object.values(SETS).forEach(s => scene.add(s.group));
 
 /* ================= 时间轴 ================= */
-const DURATION = 96;
+/* 时间扭曲：输出时间 u ↔ 剧情时间 s（剧情里的动画都按 s 写；说话变长的地方把 s 拉慢） */
+const WARP = [[0,0],[16.5,16.5],[29.5,27.2],[33.0,30.0],[36.2,33.1],[39.6,35.7],[43.0,38.2],[46.3,41.0],[49.7,43.6],[52.9,46.2],
+  [58.0,50.0],[67.0,57.0],[74.5,64.0],[81.1,70.0],[84.5,73.1],[87.5,76.0],[90.9,79.4],[97.3,82.5],[104.2,88.8],[111.4,96.0]];
+function warp(x, from, to){ for (let i=0;i<WARP.length-1;i++){ const A = WARP[i], B = WARP[i+1];
+    if (x <= B[from] || i === WARP.length-2) return A[to] + (B[to]-A[to]) * (x - A[from]) / (B[from] - A[from]); } }
+const S = u => warp(u, 0, 1), U = s => warp(s, 1, 0);
+const DURATION = 111.4;
+/* 字幕（输出时间）：大白话，一看就懂；每句 ≥ 2.4 秒 */
 const SUBS = [
   [0.15, 3.3,  '刷朋友圈，别人总在<em>聚会</em>；'],
   [3.4, 6.5,   '在群里说话，<em>没人</em>接茬；'],
   [6.6, 9.7,   '过个生日，人家的祝福<em>刷了屏</em>。'],
   [9.8, 12.9,  '你是不是也觉得：大家都比你<em>受欢迎</em>？'],
-  [16.6, 19.4, '1991年，社会学家费尔德发表了一篇论文：'],
-  [19.4, 22.3, '《为什么你的朋友比你朋友多》'],
-  [22.3, 24.8, '他翻出1961年的高中友谊调查，'],
-  [24.8, 27.2, '多数人的朋友，确实比自己<em>受欢迎</em>。'],
-  [27.3, 30.0, '做个实验：8个人，10段友谊；'],
-  [30.0, 33.1, '牌子上，是每个人的朋友数。'],
-  [33.1, 35.7, '再看看：朋友们平均有几个朋友？'],
-  [35.7, 38.2, '8个人里，<red>6</red>个人的朋友比自己多。'],
-  [38.2, 41.0, '例外只有一个：中间的「社交达人」。'],
-  [41.0, 43.6, '他有<em>6</em>个朋友，就出现在<em>6</em>份好友名单里；'],
-  [43.6, 46.2, '越受欢迎，越常出现在「你的朋友」里。'],
-  [46.2, 50.0, '人均<em>2.5</em>个朋友，朋友的人均却有<red>3.2</red>个。'],
-  [50.2, 53.5, '只要每个人的朋友数不一样多，'],
-  [53.5, 56.9, '朋友的平均朋友数，就一定<em>高于平均</em>。'],
-  [57.0, 60.5, '放大到一千人的网络：'],
-  [60.5, 64.0, `<red>${BA_PCT}%</red> 的人，朋友比自己受欢迎。`],
-  [64.0, 67.0, '2011年，研究者分析了<em>7.21亿</em> Facebook 用户：'],
-  [67.0, 70.0, '绝大多数人的朋友，都比自己朋友多。'],
-  [70.1, 73.1, '2009年哈佛：随机找了<em>319</em>个学生，'],
-  [73.1, 76.0, '再让他们说出朋友——又得到<em>425</em>人。'],
-  [76.0, 79.4, '结果，朋友组的流感，早来了约<red>两周</red>。'],
-  [79.4, 82.5, '想最早发现疫情？别挑人，挑「<em>他的朋友</em>」。'],
-  [82.6, 85.6, '所以，下次觉得朋友都比你受欢迎——'],
-  [85.6, 88.8, '别难过：<em>大多数人</em>，都这么觉得。'],
-  [89.0, 96.0, '你觉得，你是图里的<em>哪个点</em>？'],
+  [16.6, 19.9, '1991年，社会学家费尔德专门研究了这件事，'],
+  [19.9, 23.0, '论文题目就叫：《为什么你的朋友比你朋友多》'],
+  [23.0, 26.3, '他拿1961年一群高中生的交友名单来算，'],
+  [26.3, 29.4, '发现：大多数人的朋友，真的比自己<em>朋友多</em>。'],
+  [29.5, 33.0, '我们来做个小实验：8个人，红线连着的就是朋友。'],
+  [33.0, 36.2, '每个人身后的牌子，写着他有几个朋友。'],
+  [36.2, 39.6, '现在每人算一算：我的朋友们，平均有几个朋友？'],
+  [39.6, 43.0, '8个人里，有<red>6</red>个人发现：朋友比自己更受欢迎。'],
+  [43.0, 46.3, '只有中间这位例外，他就是朋友最多的「<em>社交达人</em>」。'],
+  [46.3, 49.7, '为什么？因为他有6个朋友，这6个人都会把他算进去；'],
+  [49.7, 52.9, '朋友越多的人，就越容易出现在<em>你的朋友名单</em>里。'],
+  [52.9, 55.4, '所以，大家平均只有<em>2.5</em>个朋友，'],
+  [55.4, 57.9, '可大家的朋友，平均却有<red>3.2</red>个。'],
+  [58.1, 61.0, '为什么会这样？说白了很简单：'],
+  [61.0, 64.0, '人缘好的人，会出现在<em>很多人</em>的朋友名单里；'],
+  [64.0, 67.0, '所以你数朋友时，数到的总是<em>偏受欢迎</em>的人。'],
+  [67.0, 70.5, '换成一千个人，结果也一样：'],
+  [70.5, 74.4, `有<red>${BA_PCT}%</red>的人，都发现朋友比自己受欢迎。`],
+  [74.5, 77.8, '2011年，有人统计了7亿多 Facebook 用户，'],
+  [77.8, 81.0, '结果还是：<em>绝大多数人</em>的朋友，都比自己朋友多。'],
+  [81.1, 84.5, '2009年流感季，哈佛的研究者随便找了319个学生，'],
+  [84.5, 87.5, '又让他们说出自己的朋友，一共425人。'],
+  [87.5, 90.9, '结果，被点名的这些朋友，早了大约<red>两周</red>得流感。'],
+  [90.9, 94.1, '因为人缘好的人，接触的人多，总是<em>最先</em>被传染；'],
+  [94.1, 97.2, '所以想早点发现疫情，多留意这些<em>人缘好</em>的人就行。'],
+  [97.3, 100.6, '所以，下次觉得朋友都比你受欢迎——'],
+  [100.6, 104.1, '别难过，这不是你的问题：<em>大多数人</em>都这么觉得。'],
+  [104.4, 111.4, '你觉得，你是图里的<em>哪个点</em>？评论区告诉我。'],
 ];
 const ALL3 = ['feed','chat','bday'];
 const WIDE_P = V3(26, 46, 62), WIDE_L = V3(26, 0, 0);
@@ -696,17 +708,15 @@ const SHOTS = [
   {t0: 88.8, t1: 96.0, sets: ALL3, p: [WIDE_P, V3(26, 40, 56)], l: [WIDE_L, WIDE_L], wide: true, blur: 16, band: 0, fade: .42},
 ];
 const TICKS = [[0.4, '朋友圈都在聚会'], [3.9, '群里没人接话'], [7.1, '生日冷冷清清']];
-const CHECK = ['共鸣', '悖论', '原理', '应用'], CHECK_T = [16.3, 50.0, 57.0, 82.5];
+const CHECK = ['你的感受', '是真的吗', '为什么', '有什么用'], CHECK_T = [16.3, 50.0, 57.0, 82.5];
 /* 右上角：[起, 止, 大字(斜体), 小字] */
 const CORNER = [
-  [16.6, 22.3, 'AJS · 1991', '费尔德 · 论文'],
-  [22.3, 27.2, 'Coleman · 1961', '高中友谊调查'],
-  [33.4, 38.2, null, '朋友比自己受欢迎', 'n8'],
-  [46.6, 50.0, '2.5 < 3.2', '人均 vs 朋友的人均'],
-  [57.4, 64.0, null, '朋友比自己受欢迎', 'pct'],
-  [64.0, 70.0, 'Facebook · 2011', '7.21 亿活跃用户'],
-  [70.2, 79.4, 'Harvard · 2009', 'H1N1 · 流感季'],
-  [79.4, 82.5, 'Cohen et al. · 2003', '熟人免疫策略'],
+  [16.6, 22.3, '1991', '社会学家费尔德的论文'],
+  [22.3, 27.2, '1961', '一群高中生的交友名单'],
+  [33.4, 38.2, null, '发现朋友更受欢迎', 'n8'],
+  [57.4, 64.0, null, '发现朋友更受欢迎', 'pct'],
+  [64.0, 70.0, '2011', 'Facebook · 7 亿多用户'],
+  [70.2, 82.5, '2009', '哈佛 · 流感季'],
 ];
 /* 音效：[秒, 类型, 音量] —— sfx.py 读取 */
 const SFX = [
@@ -727,7 +737,7 @@ const SFX = [
   [79.4, 'whoosh', .6], [80.2, 'yarn', .6], [80.95, 'ding', .8],
   [82.5, 'whoosh', .8], [85.2, 'pop', .4], [85.5, 'pop', .4], [85.8, 'pop', .4], [86.1, 'pop', .4], [88.8, 'boom', .6],
 ];
-window.SFX_CUES = SFX;
+window.SFX_CUES = SFX.map(([t, k, v]) => [Math.round(U(t)*1000)/1000, k, v]);
 
 /* ================= 叠加层 ================= */
 const $ = id => document.getElementById(id);
@@ -738,11 +748,11 @@ function spans(zh){ let out = '', cls = '';
     for (const ch of part) out += `<span class="ch ${cls}">${ch === ' ' ? '&nbsp;' : ch}</span>`; }
   return out; }
 let curSub = null, curCheck = null, curCorner = null, curTitle = null;
-function overlay(t){
-  const sub = SUBS.find(([a,b]) => t >= a && t < b), el = $('subtitle');
+function overlay(u, t){
+  const sub = SUBS.find(([a,b]) => u >= a && u < b), el = $('subtitle');
   if (sub){ if (curSub !== sub){ el.innerHTML = spans(sub[2]); curSub = sub; }
-    el.style.opacity = 1 - ease(seg(t, sub[1]-.2, sub[1]));
-    el.querySelectorAll('.ch').forEach((s,i)=>{ const k = easeOut(seg(t, sub[0]+i*.03, sub[0]+i*.03+.22));
+    el.style.opacity = 1 - ease(seg(u, sub[1]-.2, sub[1]));
+    el.querySelectorAll('.ch').forEach((s,i)=>{ const k = easeOut(seg(u, sub[0]+i*.025, sub[0]+i*.025+.22));
       s.style.opacity = k; s.style.transform = `translateY(${(1-k)*16}px)`; });
   } else { el.innerHTML = ''; curSub = null; }
   // 左上：开场"今日扎心"，之后"检查单"
@@ -752,7 +762,7 @@ function overlay(t){
     if (n) html = `<div class="head">今日扎心 <i>×${n}</i></div>` + TICKS.slice(0,n).map(([,s],i)=>`<div class="row" style="opacity:${i===n-1?1:.55}"><div class="box x"></div>${s}</div>`).join('');
   } else if (t >= CHECK_T[0] && t < 88.8){
     const done = CHECK_T.filter(x => t >= x).length;
-    html = `<div class="head">友谊悖论 · 检查单 <i>${Math.min(done,4)}/4</i></div>` + CHECK.map((s,i)=>{
+    html = `<div class="head">看懂这件事 <i>${Math.min(done,4)}/4</i></div>` + CHECK.map((s,i)=>{
       const st = i < done ? 'on' : '', cur = i === done ? 'cur' : '';
       return `<div class="row ${cur}" style="opacity:${i < done || i === done ? 1 : .5}"><div class="box ${st}"></div>${s}</div>`; }).join('');
   }
@@ -804,14 +814,14 @@ function labels(t, sh){
   if (t >= 82.5 && t < 84.6) L.push(['you', wp(SETS.feed.you, 2.25), '你', 1 - seg(t, 83.8, 84.5)]);
   if (sh.sets[0] === 'net'){
     L.push(['you', wp(SETS.net.ppl[6], 2.25), '你', seg(t, 28.4, 28.9) * (1 - seg(t, 32.9, 33.2)) + (t > 41 ? seg(t, 41.2, 41.6) * 0 : 0)]);
-    if (t >= 46.6){ L.push(['th1', V3(137.4, 5.9, -1.5), '人均 2.5', seg(t, 47.6, 48.0), 'small']); L.push(['th2', V3(139.0, 5.9, -1.5), '朋友的人均 3.2', seg(t, 48.5, 48.9), 'small gold']); }
+    if (t >= 46.6){ L.push(['th1', V3(136.8, 4.0, -1.5), '大家平均 2.5 个朋友', seg(t, 47.6, 48.0), 'small lft']); L.push(['th2', V3(139.6, 4.8, -1.5), '朋友们平均 3.2 个朋友', seg(t, 48.5, 48.9), 'small gold rgt']); }
   }
   if (sh.sets[0] === 'campus'){
-    L.push(['g1', V3(297.6, 2.7, 1.6), '随机学生 319', t < 76 ? seg(t, 70.6, 71.0) : 0, 'small']);
-    L.push(['g2', V3(305.2, 2.7, 1.6), '被点名的朋友 425', t < 76 ? seg(t, 73.5, 73.9) : 0, 'small gold']);
-    if (t >= 76 && t < 79.4){ L.push(['th1', V3(299.0, 6.6, -3.2), '随机', seg(t, 76.2, 76.6), 'small']); L.push(['th2', V3(301.0, 6.6, -3.2), '朋友', seg(t, 76.2, 76.6), 'small gold']);
-      L.push(['early', V3(303.6, 4.6, -3.2), '早约两周', seg(t, 77.6, 78.0), 'gold']); }
-    if (t >= 79.4){ L.push(['hub2', wp(SETS.campus.hub, 2.1), '随机一人的朋友：枢纽', seg(t, 80.9, 81.3), 'small gold']); }
+    L.push(['g1', V3(297.6, 2.7, 1.6), '随便找的 319 个学生', t < 76 ? seg(t, 70.6, 71.0) : 0, 'small']);
+    L.push(['g2', V3(305.2, 2.7, 1.6), '他们说出的 425 个朋友', t < 76 ? seg(t, 73.5, 73.9) : 0, 'small gold']);
+    if (t >= 76 && t < 79.4){ L.push(['th1', V3(298.3, 3.6, -3.2), '随便找的学生', seg(t, 76.2, 76.6), 'small lft']); L.push(['th2', V3(301.7, 5.2, -3.2), '他们的朋友', seg(t, 76.2, 76.6), 'small gold rgt']);
+      L.push(['early', V3(301.7, 3.4, -3.2), '早了大约两周', seg(t, 77.6, 78.0), 'gold rgt']); }
+    if (t >= 79.4){ L.push(['hub2', wp(SETS.campus.hub, 2.1), '人缘最好的那个人', seg(t, 80.9, 81.3), 'small gold']); }
   }
   const used = new Set();
   for (const [id, pos, text, a, cls] of L){ label(id, pos, text, a, cls); used.add(id); }
@@ -824,7 +834,7 @@ const SET_T0 = {chat: 3.4};
 /* 顶部钩子标题：第 0 帧即完整可见；开场大字，正片缩小常驻 */
 function hookUI(t){
   const el = $('hook'), t1 = el.querySelector('.t'), u = el.querySelector('.u'), bg = $('hookbg');
-  const big = t < 13.1, hide = (t >= 13.1 && t < 16.6) || t >= 88.8;
+  const big = t < 13.1, hide = (t >= 13.1 && t < 16.6) || t >= 104.2;
   if (hide){ el.style.opacity = 0; bg.style.opacity = 0; return; }
   // 逐字从模糊到清晰（开场 0.05s 起；正片常驻条 16.6s 起）
   const st = big ? .05 : 16.6;
@@ -840,14 +850,16 @@ function hookUI(t){
     const ut = t < 6.5 ? t - .9 : t % 6.5; u.style.width = (560*easeOut(seg(ut, 0, 1.0))) + 'px'; u.style.opacity = (ut < 0 ? 0 : 1) * (1 - seg(ut, 5.6, 6.5));
     el.style.opacity = 1 - out; bg.style.opacity = (1 - out) * ease(seg(t, 0, .4));
   } else {
-    const k = ease(seg(t, 16.6, 17.2)) * (1 - ease(seg(t, 88.3, 88.8)));
+    const k = ease(seg(t, 16.6, 17.2)) * (1 - ease(seg(t, 103.7, 104.2)));
     el.style.top = '34px'; t1.style.fontSize = '46px'; t1.style.transform = 'none';
     u.style.width = '0px'; u.style.opacity = 0;
     el.style.opacity = .92*k; bg.style.opacity = .55*k;
   }
 }
-const OVERLAY_ONLY = /overlay/.test(location.search);   // ?overlay：只渲染顶部标题层（透明背景），用于给已渲好的成片叠字
-window.render = function(t){
+/* 分层渲染：?base 只出 3D 画面；?overlay 只出文字层（透明背景）；改字只需重渲文字层 */
+const MODE = /overlay/.test(location.search) ? 'overlay' : /base/.test(location.search) ? 'base' : 'full';
+window.render = function(u){
+  const t = S(u);
   const sh = shotAt(t), raw = seg(t, sh.t0, sh.t1), k = sh.out ? easeOut(raw) : ease(raw);
   camera.position.lerpVectors(sh.p[0], sh.p[1], k);
   // 切镜后 0.5 秒的推入落定 + 轻微手持感
@@ -865,10 +877,8 @@ window.render = function(t){
   key.position.set(c.x + 9, 22, c.z + 12); key.target.position.copy(c);
   if (key.shadow.camera.right !== sz){ key.shadow.camera.left = -sz; key.shadow.camera.right = sz; key.shadow.camera.top = sz; key.shadow.camera.bottom = -sz; key.shadow.camera.far = 120; key.shadow.camera.updateProjectionMatrix(); }
   camera.updateMatrixWorld();
-  post(sh.focus ?? .5, sh.band ?? (sh.wide ? .1 : .14), sh.blur ?? (sh.wide ? 9 : 7), t, sh.fade ?? 1);
-  labels(t, sh);
-  overlay(t);
-  hookUI(t);
+  if (MODE !== 'overlay') post(sh.focus ?? .5, sh.band ?? (sh.wide ? .1 : .14), sh.blur ?? (sh.wide ? 9 : 7), t, sh.fade ?? 1);
+  if (MODE !== 'base'){ labels(t, sh); overlay(u, t); hookUI(u); }
 };
 window.setup = function(done){
   const text = document.documentElement.innerHTML + SUBS.map(s=>s[2]).join('');
@@ -878,11 +888,11 @@ window.setup = function(done){
 };
 window.DURATION = DURATION;
 window.STATS = {g8: {mu: G8.mu, fof: G8.fof, nPar: G8.nPar}, ba: {pct: BA_PCT}};
-if (OVERLAY_ONLY){
-  document.body.style.background = 'transparent'; document.documentElement.style.background = 'transparent';
-  for (const id of ['gl','labels','check','corner','subtitle','watermark','title']) $(id).style.display = 'none';
-  window.render = function(t){ hookUI(t); };
+if (MODE === 'overlay'){
+  document.body.style.background = 'transparent'; document.documentElement.style.background = 'transparent'; $('stage').style.background = 'transparent';
+  $('gl').style.display = 'none';
 }
+if (MODE === 'base') for (const id of ['labels','check','corner','subtitle','watermark','title','hook','hookbg']) $(id).style.display = 'none';
 let t0 = performance.now();
 (function loop(){ if (window.__RENDER_MODE__) return; window.render(((performance.now()-t0)/1000) % DURATION); requestAnimationFrame(loop); })();
 </script>

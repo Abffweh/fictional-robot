@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""overlay_hook.py — 只渲染顶部钩子标题层（透明 PNG 序列），用于叠加到已渲好的帧上。
+"""overlay_hook.py — 渲染全部文字层（字幕、标签、检查单、标题等，透明 PNG 序列），叠加到 ?base 渲出的 3D 画面上。
 用法: python3 overlay_hook.py index.html out_dir/ --fps 24 [--times 0,5,20]"""
 import argparse, asyncio, os
 async def main():
