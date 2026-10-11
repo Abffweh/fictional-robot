@@ -37,6 +37,8 @@
   #titlecard .name   { font: 900 104px 'Noto Serif SC', serif; color: #C9A96A; letter-spacing: 6px;
     text-shadow: 0 4px 40px rgba(201,169,106,.25); }
   #titlecard .q      { font: 500 34px 'Noto Sans SC'; color: #EAEAF2; margin-top: 14px; }
+  #subtitle .ch, #titlecard .ch { display: inline-block; }
+  #subtitle .ch.em { color: #C9A96A; }
   #titlecard .q-en   { font: italic 400 26px 'EB Garamond', serif; color: #8A8AA0; }
 </style>
 </head>
@@ -316,7 +318,16 @@ function drawBG(t){
     bgc.fillStyle = `rgba(234,234,242,${a})`;
     bgc.fillRect(s.x + Math.sin(t*.05+s.p)*6, s.y, s.r, s.r);
   }
+  // 缓慢上浮的柔焦光斑，增加景深
+  for (const b of BOKEH){
+    const y = ((b.y - t*b.v) % 1240 + 1240) % 1240 - 80, x = b.x + Math.sin(t*.3+b.p)*30;
+    const g2 = bgc.createRadialGradient(x,y,0, x,y,b.r);
+    g2.addColorStop(0, `rgba(${b.gold?'201,169,106':'150,150,210'},${b.a})`); g2.addColorStop(1, 'rgba(0,0,0,0)');
+    bgc.fillStyle = g2; bgc.fillRect(x-b.r, y-b.r, b.r*2, b.r*2);
+  }
 }
+const BOKEH = Array.from({length: 26}, () => ({x: rndBG()*1920, y: rndBG()*1240, r: 30+rndBG()*70, v: 8+rndBG()*22,
+  p: rndBG()*6, a: .03+rndBG()*.05, gold: rndBG() < .35}));
 
 /* ================= 场景 ================= */
 const sc = document.getElementById('scene'), c = sc.getContext('2d');
@@ -348,18 +359,50 @@ function drawHook(c, lt, tf){
   drawNode(c, you[0], you[1], 38*lerp(.6,1,yk), '你', {a: yk*dimYou, font: `700 26px ${SANS}`});
   drawBadge(c, you[0]+36, you[1]-42, String(HOOK.you), {a: ease(seg(lt, 2, 2.6))*dimYou, col: DIM});
 }
-function sceneHook(t){
-  const a = vis(t, 0, 14, .1, .8); if (a <= 0) return;
-  const s = 1 + .12*ease(seg(t, 10.5, 14));
-  c.save(); c.globalAlpha = a;
-  c.translate(960,420); c.scale(s,s); c.translate(-960,-420);
-  drawHook(c, t, t);
+/* 开场 0–8 秒（输出时间 u）：第 0 帧即"你"的特写 → 1 秒内猛拉远 + 冲击波 → 2 秒落对比数字 → 拉远成千人网络 → 甩入标题 */
+const HOOK_AVG = Math.round(HOOK.fr.reduce((s,f)=>s+f.v,0)/HOOK.fr.length);
+function sceneHook(u){
+  if (u >= 8.05) return;
+  const lt = Math.min(9, 1 + u*4.5);                       // 复用 drawHook 的节奏，1.8 秒内全部展开
+  const pull = easeOut(seg(u, 0, 1.05));                    // 2.4× 特写 → 1×
+  const out = ease(seg(u, 5.1, 7.2));                       // 拉远成"人人如此"
+  const whip = ease(seg(u, 7.55, 8.05));                    // 甩入标题
+  const s = lerp(2.4, 1, pull) * lerp(1, .3, out) * lerp(1, 1.5, whip);
+  const rot = .05*(1-pull) + .015*Math.sin(u*.9);
+  // 背景里的千人网络（"大多数人都是这样"）
+  if (out > 0) drawBA(c, u, {a: out*(1-whip), edgesFull: true, cx: 960, cy: 430, s: lerp(2.2, 1, out)*lerp(1,1.3,whip),
+    nodeK: () => 1, goldK: () => 1});
+  c.save(); c.globalAlpha = 1 - whip;
+  c.translate(960,430); c.rotate(rot); c.scale(s,s); c.translate(-960,-430);
+  // 冲击波
+  for (let w=0; w<3; w++){
+    const k = seg(u, .1+w*.45, 1.5+w*.45); if (k <= 0 || k >= 1) continue;
+    c.strokeStyle = `rgba(201,169,106,${.55*(1-k)})`; c.lineWidth = 3*(1-k)+1;
+    c.beginPath(); c.arc(960, 430, 40 + easeOut(k)*620, 0, Math.PI*2); c.stroke();
+  }
+  // "你"的心跳光晕
+  const beat = Math.max(0, Math.sin(u*7.5))**6;
+  drawNode(c, 960, 430, 44 + beat*6, '', {a: .0001 + .9*(1-out), glow: .35 + .5*beat, gc: '234,234,242'});
+  drawHook(c, lt, u*1.6);
   c.restore();
+  // 右侧对比：你 41 vs 朋友平均 141
+  const pa = ease(seg(u, 1.45, 1.85)) * (1 - ease(seg(u, 4.9, 5.4)));
+  if (pa > 0){
+    const punch = 1 + .18*(1 - easeOut(seg(u, 1.95, 2.45)));
+    T(c, '你', 1650, 300, `500 26px ${SANS}`, DIM, 'center', pa);
+    T(c, String(HOOK.you), 1650, 350, `900 58px ${SANS}`, DIM, 'center', pa);
+    T(c, 'vs', 1650, 420, `italic 400 30px ${GAR}`, DIM, 'center', pa);
+    const fa = pa * ease(seg(u, 1.9, 2.1));
+    T(c, '朋友们平均', 1650, 488, `500 26px ${SANS}`, GOLD, 'center', fa);
+    c.save(); c.translate(1650, 556); c.scale(punch, punch);
+    T(c, String(Math.round(HOOK_AVG*easeOut(seg(u, 1.9, 2.5)))), 0, 0, `900 92px ${SANS}`, GOLD, 'center', fa);
+    c.restore();
+  }
 }
 
 /* ② 历史锚点：论文首页 + 书影 */
 function sceneDocs(t){
-  const a = vis(t, 20, 39, .9, .7); if (a <= 0) return;
+  const a = vis(t, 19.3, 39, .9, .7); if (a <= 0) return;
   const kin = easeOut(seg(t, 20, 21.4));
   const mv = ease(seg(t, 31, 32.6));
   // 论文首页
@@ -481,6 +524,9 @@ function sceneNet(t){
     c.beginPath(); c.arc(lerp(p[0],q[0],ph), lerp(p[1],q[1],ph), r0, 0, Math.PI*2); c.fill();
   };
   G8.edges.forEach(([u,v],j)=>{
+    // 平时也有细小光点沿连线流动，画面不静止
+    tok(u, v, j*.37, '234,234,242', 47.4, 63.3, 2.6); tok(v, u, j*.37+.5, '234,234,242', 47.4, 63.3, 2.6);
+    tok(u, v, j*.37, '234,234,242', 71.6, 75.3, 2.6);
     if (u === 7) tok(7, v, j, '201,169,106', 63.4, 71.5, 6);
     else { tok(u, v, j, '234,234,242', 67, 71.5, 4.5); tok(v, u, j+.5, '234,234,242', 67, 71.5, 4.5); }
   });
@@ -816,46 +862,112 @@ function sceneEnd(t){
   }
 }
 
-function drawScene(t){
-  c.clearRect(0,0,1920,1080);
-  sceneHook(t); sceneDocs(t); sceneRules(t); sceneNet(t); sceneFormula(t);
-  sceneBA(t); sceneFB(t); sceneFlu(t); sceneAcq(t); sceneOutro(t); sceneEnd(t);
+/* ================= 时间轴：开场 8 秒独立，之后剧情 1.3 倍速 ================= */
+const HOOK_END = 8, SPEED = 1.3;
+const S = u => 14 + (u - HOOK_END)*SPEED;            // 输出时间 → 剧情时间
+const U = s => HOOK_END + (s - 14)/SPEED;            // 剧情时间 → 输出时间
+CFG.duration = Math.round(U(140)*10)/10;              // ≈ 104.9 秒
+const HOOK_SUBS = [
+  [0.0, 2.6, '你的朋友，大概率比你<em>受欢迎</em>', 'Your friends are probably more popular than you.'],
+  [2.6, 5.2, '不是你不够好，是<em>数学</em>', "It's not you. It's math."],
+  [5.2, 7.9, '而且，<em>大多数人</em>都是这样', 'And it is true for most people.'],
+];
+const SUBS_U = HOOK_SUBS.concat(SUBTITLES.filter(x => x[0] >= 14).map(([a,b,z,e]) => [U(a), U(b), z, e]));
+const SECTIONS_U = [[0,'','']].concat(SECTIONS.filter(x => x[0] >= 14).map(([a,l,n]) => [U(a), l, n]));
+const TITLE_U = [U(TITLE_CARD[0]), U(TITLE_CARD[1])];
+
+/* 镜头：每个剧情切点"推入落定"，段内缓慢推近 + 微漂移 */
+const CUTS = [14,20,31,39,45,49,56,63,75,83,86,91,95,99,103,107,111,115,119,123,127,131,135];
+function camera(s){
+  let i = 0; while (i+1 < CUTS.length && s >= CUTS[i+1]) i++;
+  const a = CUTS[i], b = CUTS[i+1] ?? 140;
+  const settle = 1 - easeOut(seg(s, a, a+.75));
+  return {scale: (1 + .03*ease(seg(s, a, b))) * (1 + .06*settle),
+          rot: .006*Math.sin(s*.35) + .02*settle*(i%2 ? 1 : -1),
+          dx: 10*Math.sin(s*.23), dy: 6*Math.cos(s*.19)};
+}
+/* 切点处一道金色斜向扫光 */
+function sweep(s){
+  for (const cut of CUTS){
+    const k = seg(s, cut-.2, cut+.45); if (k <= 0 || k >= 1) continue;
+    const x = lerp(-600, 2500, ease(k));
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const g = c.createLinearGradient(x-260, 0, x+260, 0);
+    g.addColorStop(0, 'rgba(201,169,106,0)'); g.addColorStop(.5, `rgba(201,169,106,${.16*Math.sin(Math.PI*k)})`); g.addColorStop(1, 'rgba(201,169,106,0)');
+    c.setTransform(1, 0, -.35, 1, 0, 0); c.fillStyle = g; c.fillRect(x-700, 0, 1400, 1080);
+    c.restore();
+  }
+}
+function drawScene(u){
+  c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,1920,1080);
+  if (u < HOOK_END + .05) sceneHook(u);
+  if (u < HOOK_END) return;
+  const s = S(u), cam = camera(s);
+  c.save();
+  c.translate(960 + cam.dx, 450 + cam.dy); c.rotate(cam.rot); c.scale(cam.scale, cam.scale); c.translate(-960, -450);
+  sceneDocs(s); sceneRules(s); sceneNet(s); sceneFormula(s);
+  sceneBA(s); sceneFB(s); sceneFlu(s); sceneAcq(s); sceneOutro(s); sceneEnd(s);
+  c.restore();
+  sweep(s);
 }
 
 /* ================= 覆盖层 ================= */
 const $ = id => document.getElementById(id);
-function drawOverlay(t){
-  const inTitle = t >= TITLE_CARD[0] && t < TITLE_CARD[1];
-  const sub = SUBTITLES.find(([a,b]) => t >= a && t < b);
+/* 把 '文字<em>强调</em>' 拆成逐字 span，字幕逐字弹入 */
+function spansHTML(zh){
+  let out = '', em = false;
+  for (const part of zh.split(/(<em>|<\/em>)/)){
+    if (part === '<em>'){ em = true; continue; } if (part === '</em>'){ em = false; continue; }
+    for (const ch of part) out += `<span class="ch${em ? ' em' : ''}">${ch === ' ' ? '&nbsp;' : ch}</span>`;
+  }
+  return out;
+}
+let curSub = null, curName = null;
+function drawOverlay(u){
+  const s = S(u);
+  const inTitle = u >= TITLE_U[0] && u < TITLE_U[1];
+  const sub = SUBS_U.find(([a,b]) => u >= a && u < b);
   const el = $('subtitle'), elEn = $('subtitle-en');
-  if (sub && !inTitle) {
+  if (sub && !inTitle){
     const [a, b, zh, en] = sub;
-    const kIn  = ease(clamp((t-a)/0.45, 0, 1));
-    const kOut = 1 - ease(clamp((t-(b-0.4))/0.4, 0, 1));
-    el.style.opacity = kIn * kOut;
-    el.style.transform = `translateY(${lerp(8,0,kIn)}px)`;
-    if (el.innerHTML !== zh) el.innerHTML = zh;
-    elEn.textContent = en || '';
-    elEn.style.opacity = kIn * kOut * .9;
-  } else { el.innerHTML = ''; elEn.textContent = ''; }
+    if (curSub !== sub){ el.innerHTML = spansHTML(zh); curSub = sub; }
+    const kOut = 1 - ease(seg(u, b-.3, b));
+    el.style.opacity = kOut;
+    el.querySelectorAll('.ch').forEach((sp, i) => {
+      const k = easeOut(seg(u, a + i*.03, a + i*.03 + .28));
+      sp.style.opacity = k; sp.style.transform = `translateY(${(1-k)*18}px) scale(${lerp(1.25,1,k)})`;
+    });
+    const ke = ease(seg(u, a+.25, a+.6));
+    elEn.textContent = en || ''; elEn.style.opacity = ke * kOut * .9;
+    elEn.style.transform = `translateY(${(1-ke)*8}px)`;
+  } else { el.innerHTML = ''; elEn.textContent = ''; curSub = null; }
   const tc = $('titlecard');
-  if (inTitle) {
+  if (inTitle){
     tc.style.display = 'flex';
-    const k = ease(clamp((t-TITLE_CARD[0])/1.2, 0, 1)) * (1 - ease(seg(t, TITLE_CARD[1]-.7, TITLE_CARD[1])));
+    const k = ease(seg(u, TITLE_U[0], TITLE_U[0]+.5)) * (1 - ease(seg(u, TITLE_U[1]-.45, TITLE_U[1])));
     tc.style.opacity = k;
-    tc.querySelector('.name').textContent = TITLE_CARD[2];
+    const name = tc.querySelector('.name');
+    if (curName === null){ name.innerHTML = spansHTML(TITLE_CARD[2]); curName = 1; }
+    name.querySelectorAll('.ch').forEach((sp, i) => {
+      const kk = easeOut(seg(u, TITLE_U[0]+.1 + i*.05, TITLE_U[0]+.45 + i*.05));
+      sp.style.opacity = kk; sp.style.transform = `translateY(${(1-kk)*30}px)`;
+    });
     tc.querySelector('.q').textContent = TITLE_CARD[3];
     tc.querySelector('.q-en').textContent = TITLE_CARD[4];
-    tc.querySelector('.name').style.transform = `scale(${lerp(.94, 1, easeOut(seg(t, TITLE_CARD[0], TITLE_CARD[1])))})`;
+    tc.querySelector('.q').style.opacity = ease(seg(u, TITLE_U[0]+.9, TITLE_U[0]+1.3));
+    tc.querySelector('.q-en').style.opacity = ease(seg(u, TITLE_U[0]+1.1, TITLE_U[0]+1.5));
+    name.style.transform = `scale(${lerp(1.08, 1, easeOut(seg(u, TITLE_U[0], TITLE_U[1])))})`;
   } else tc.style.display = 'none';
-  let sec = SECTIONS[0];
-  for (const s of SECTIONS) if (t >= s[0]) sec = s;
+  let i = 0; while (i+1 < SECTIONS_U.length && u >= SECTIONS_U[i+1][0]) i++;
+  const sec = SECTIONS_U[i], ks = ease(seg(u, sec[0], sec[0]+.4));
   $('toplabel').textContent = sec[1] ? `${CFG.topic}　${sec[1]}` : CFG.topic;
+  $('toplabel').style.opacity = sec[1] ? ks : 1;
   $('annotation').textContent = sec[2] || '';
+  $('annotation').style.opacity = ks; $('annotation').style.transform = `translateY(${(1-ks)*10}px)`;
 }
 
 /* ================= 帧入口 ================= */
-window.render = function(t){ drawBG(t); drawScene(t); drawOverlay(t); };
+window.render = function(u){ drawBG(u); drawScene(u); drawOverlay(u); };
 /* 渲染管线的异步初始化：把脚本里出现的所有字形都预加载，防止中途换字体 */
 window.setup = function(done){
   const text = document.querySelector('script').textContent + document.body.innerText;

@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!--
+  《你的朋友，比你受欢迎》v3 · 3D 黏土微缩风 · @Leo
+  - three.js（vendor/three.min.js，MIT）实时渲染；window.render(t) 纯时间函数，逐帧截图
+  - 无背景音乐：音效时间表见 window.SFX_CUES，由 sfx.py 合成
+  - 片中统计数字全部由代码现场计算
+-->
+<title>你的朋友，比你受欢迎 · 3D</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@500;700&family=EB+Garamond:ital,wght@0,500;0,700;1,500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #1a120c; }
+  #stage { position: relative; width: 1920px; height: 1080px; }
+  #gl { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  .ui { position: absolute; z-index: 20; font-family: 'Noto Serif SC', serif; color: #F3E8CF;
+        text-shadow: 0 2px 10px rgba(20,10,4,.85), 0 0 2px rgba(20,10,4,.9); }
+  #watermark { top: 1028px; left: 56px; font: 500 24px 'Noto Sans SC'; color: rgba(243,232,207,.55); }
+  #check { top: 74px; left: 70px; }
+  #check .head { font: 500 30px 'Noto Serif SC'; letter-spacing: 6px; }
+  #check .head i { font: italic 500 34px 'EB Garamond', serif; letter-spacing: 1px; margin-left: 10px; }
+  #check .row { display: flex; align-items: center; gap: 14px; margin-top: 14px; font: 700 40px 'Noto Serif SC'; }
+  #check .box { width: 34px; height: 34px; border: 3px solid #F3E8CF; border-radius: 3px; position: relative; flex: none; }
+  #check .box.on::after { content: ''; position: absolute; left: 8px; top: -6px; width: 12px; height: 26px;
+        border: solid #E7C98B; border-width: 0 5px 5px 0; transform: rotate(40deg); }
+  #check .box.x { border-color: #D8584A; }
+  #check .box.x::before, #check .box.x::after { content: ''; position: absolute; left: 13px; top: -2px; width: 3px; height: 32px; background: #D8584A; }
+  #check .box.x::before { transform: rotate(45deg); } #check .box.x::after { transform: rotate(-45deg); }
+  #corner { top: 150px; right: 80px; text-align: right; }
+  #corner .a { font: italic 500 54px 'EB Garamond', serif; }
+  #corner .a::after { content: ''; display: block; height: 3px; width: 140px; margin: 6px 0 0 auto; background: #C8463A; }
+  #corner .b { font: 500 36px 'Noto Serif SC'; letter-spacing: 6px; margin-top: 12px; }
+  #subtitle { left: 0; right: 0; top: 960px; text-align: center; font: 900 66px 'Noto Serif SC'; letter-spacing: 3px; }
+  #subtitle .ch { display: inline-block; }
+  #subtitle .em { color: #F0C987; }
+  #subtitle .red { color: #E8735F; text-decoration: underline; text-underline-offset: 10px; text-decoration-thickness: 3px; }
+  #labels { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+  .lab { position: absolute; font: 700 44px 'Noto Serif SC'; color: #F3E8CF; text-shadow: 0 2px 10px rgba(20,10,4,.9);
+         transform: translate(-50%, -100%); white-space: nowrap; }
+  .lab.small { font-size: 30px; }
+  .lab.gold { color: #F0C987; }
+  #title { position: absolute; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+  #title .s { font: 500 26px 'Noto Sans SC'; letter-spacing: 16px; color: rgba(240,201,135,.85); }
+  #title .n { font: 900 112px 'Noto Serif SC'; color: #F0C987; letter-spacing: 6px; text-shadow: 0 6px 40px rgba(0,0,0,.6); }
+  #title .q { font: 500 40px 'Noto Serif SC'; color: #F3E8CF; }
+  #title .ch { display: inline-block; }
+  #check .row.cur::before { content: '-'; position: absolute; margin-left: -26px; }
+  #check .row { position: relative; }
+  .lab::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: 30px; background: rgba(243,232,207,.75); }
+  .lab { margin-top: -30px; }
+  #title .refs { font: italic 500 30px 'EB Garamond', serif; color: rgba(243,232,207,.85); text-align: center; line-height: 1.7; margin-top: 18px; }
+  #title .note { font: 500 26px 'Noto Serif SC'; color: rgba(243,232,207,.6); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl" width="1920" height="1080"></canvas>
+  <div id="labels"></div>
+  <div id="check" class="ui"></div>
+  <div id="corner" class="ui"><div class="a"></div><div class="b"></div></div>
+  <div id="subtitle" class="ui"></div>
+  <div id="watermark" class="ui">@Leo</div>
+  <div id="title"><div class="s">VIBE知识大赏</div><div class="n"></div><div class="q"></div></div>
+</div>
+<script src="vendor/three.min.js"></script>
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const ease = t => t<.5 ? 2*t*t : 1-((-2*t+2)**2)/2;
+const easeOut = t => 1-(1-t)**3;
+const seg = (t,a,b) => clamp((t-a)/(b-a),0,1);
+const vis = (t,a,b,fi=.4,fo=.4) => Math.min(ease(seg(t,a,a+fi)), 1-ease(seg(t,b-fo,b)));
+function mulberry32(seed){ return function(){ let t = seed += 0x6D2B79F5;
+  t = Math.imul(t ^ t>>>15, t|1); t ^= t + Math.imul(t ^ t>>>7, t|61);
+  return ((t ^ t>>>14)>>>0)/4294967296; }; }
+const V3 = (x,y,z)=>new THREE.Vector3(x,y,z);
+const SERIF = "'Noto Serif SC', serif", SANS = "'Noto Sans SC', sans-serif", GAR = "'EB Garamond', serif";
+const COL = { cream:'#EFE4CF', olive:'#7D8A4E', moss:'#97A06A', brown:'#7A5235', rust:'#A9532E', you:'#D9772E',
+  mauve:'#8A5F6B', mustard:'#C9A248', sage:'#6F7D6A', clay:'#B98A64', wood:'#5A3A22', gold:'#E0B66A' };
+const PAWN_COLORS = [COL.olive, COL.brown, COL.mauve, COL.mustard, COL.sage, COL.rust, COL.moss, COL.clay];
+
+/* ================= 渲染器 ================= */
+const W = 1920, H = 1080;
+const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('gl'), antialias: false, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#2a1c12');
+scene.fog = new THREE.Fog('#2a1c12', 40, 120);
+const camera = new THREE.PerspectiveCamera(32, W/H, .1, 400);
+
+const hemi = new THREE.HemisphereLight('#ffe2bd', '#3b2414', .9); scene.add(hemi);
+const key = new THREE.DirectionalLight('#ffd6a0', 2.6);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -16; key.shadow.camera.right = 16; key.shadow.camera.top = 16; key.shadow.camera.bottom = -16;
+key.shadow.camera.near = 1; key.shadow.camera.far = 80; key.shadow.bias = -.0006; key.shadow.normalBias = .02; key.shadow.radius = 4;
+scene.add(key); scene.add(key.target);
+const fill = new THREE.DirectionalLight('#9fb4ff', .35); fill.position.set(-20, 12, -10); scene.add(fill);
+
+/* 后期：场景 → 移轴模糊（横 / 竖）→ 调色、暗角、颗粒 */
+const rtOpts = {type: THREE.HalfFloatType, samples: 4};
+const rtA = new THREE.WebGLRenderTarget(W, H, rtOpts), rtB = new THREE.WebGLRenderTarget(W, H, {type: THREE.HalfFloatType}), rtC = new THREE.WebGLRenderTarget(W, H, {type: THREE.HalfFloatType});
+const postCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2,2)); const postScene = new THREE.Scene(); postScene.add(quad);
+const blurMat = new THREE.ShaderMaterial({
+  uniforms: {tex:{value:null}, dir:{value:new THREE.Vector2(1,0)}, focus:{value:.5}, band:{value:.16}, amount:{value:6}},
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy,0.,1.); }',
+  fragmentShader: `uniform sampler2D tex; uniform vec2 dir; uniform float focus, band, amount; varying vec2 vUv;
+    void main(){ float d = max(0., abs(vUv.y - focus) - band); float r = amount * smoothstep(0., .35, d);
+      vec2 px = dir / vec2(${W}., ${H}.) * r; vec4 c = vec4(0.); float ws = 0.;
+      for (int i=-6; i<=6; i++){ float w = exp(-float(i*i)/18.); c += texture2D(tex, vUv + px*float(i)) * w; ws += w; }
+      gl_FragColor = c / ws; }`, depthTest: false });
+const gradeMat = new THREE.ShaderMaterial({
+  uniforms: {tex:{value:null}, time:{value:0}, fade:{value:1}},
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy,0.,1.); }',
+  fragmentShader: `uniform sampler2D tex; uniform float time, fade; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + time*37.1) * 43758.5453); }
+    void main(){ vec3 c = texture2D(tex, vUv).rgb;
+      c = c / (c + vec3(.82)) * 1.82;                      // 柔和高光
+      c = pow(c, vec3(1./2.2));
+      c *= vec3(1.06, .99, .88);                           // 暖调
+      c = mix(vec3(dot(c, vec3(.299,.587,.114))), c, .88);
+      float v = smoothstep(1.15, .35, length((vUv-.5)*vec2(1.25,1.)));
+      c *= mix(.45, 1., v);
+      c += (h(vUv*vec2(${W}.,${H}.)) - .5) * .045;
+      gl_FragColor = vec4(c * fade, 1.); }`, depthTest: false });
+renderer.toneMapping = THREE.NoToneMapping;   // 色调交给 gradeMat
+function post(focus, band, amount, t, fade){
+  renderer.setRenderTarget(rtA); renderer.render(scene, camera);
+  quad.material = blurMat; blurMat.uniforms.focus.value = focus; blurMat.uniforms.band.value = band; blurMat.uniforms.amount.value = amount;
+  blurMat.uniforms.tex.value = rtA.texture; blurMat.uniforms.dir.value.set(1,0); renderer.setRenderTarget(rtB); renderer.render(postScene, postCam);
+  blurMat.uniforms.tex.value = rtB.texture; blurMat.uniforms.dir.value.set(0,1); renderer.setRenderTarget(rtC); renderer.render(postScene, postCam);
+  quad.material = gradeMat; gradeMat.uniforms.tex.value = rtC.texture; gradeMat.uniforms.time.value = t; gradeMat.uniforms.fade.value = fade;
+  renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+}
+
+/* ================= 材质与贴图 ================= */
+const matCache = {};
+function clay(color, opts={}){
+  const k = color + JSON.stringify(opts);
+  if (!matCache[k]) matCache[k] = new THREE.MeshStandardMaterial({color, roughness: opts.r ?? .88, metalness: 0,
+    emissive: opts.emissive || '#000000', emissiveIntensity: opts.ei ?? 1, transparent: !!opts.transparent, opacity: opts.opacity ?? 1});
+  return matCache[k];
+}
+const TEXDRAW = [];   // 字体就绪后要重画的画布贴图
+function canvasTex(w, h, draw){
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const job = () => { const g = cv.getContext('2d'); g.clearRect(0,0,w,h); draw(g, w, h); tex.needsUpdate = true; };
+  job(); TEXDRAW.push(job); return tex;
+}
+function rr(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+/* 木纹 / 地砖 */
+const woodTex = canvasTex(1024, 1024, (g,w,h)=>{
+  g.fillStyle = '#5b3a23'; g.fillRect(0,0,w,h); const r = mulberry32(3);
+  for (let i=0;i<260;i++){ g.strokeStyle = `rgba(${30+r()*40|0},${18+r()*20|0},${8+r()*10|0},${.15+r()*.25})`; g.lineWidth = 1+r()*4;
+    g.beginPath(); const y = r()*h; g.moveTo(0,y); for (let x=0;x<=w;x+=64) g.lineTo(x, y+Math.sin(x*.01+i)*6); g.stroke(); }
+});
+woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping; woodTex.repeat.set(15, 6);
+const tileTex = canvasTex(512, 512, (g,w,h)=>{
+  g.fillStyle = '#b08a64'; g.fillRect(0,0,w,h); const r = mulberry32(9), n = 4, s = w/n;
+  for (let i=0;i<n;i++) for (let j=0;j<n;j++){ g.fillStyle = `hsl(${28+r()*6},${30+r()*8}%,${46+r()*8}%)`; g.fillRect(i*s+3,j*s+3,s-6,s-6); }
+  for (let k=0;k<900;k++){ g.fillStyle = `rgba(60,36,20,${r()*.5})`; g.fillRect(r()*w, r()*h, 2+r()*3, 2+r()*3); }
+});
+tileTex.wrapS = tileTex.wrapT = THREE.RepeatWrapping;
+
+/* ================= 道具 ================= */
+const pawnBodyGeo = new THREE.LatheGeometry([V3(0,0,0),V3(.46,0,0),V3(.5,.08,0),V3(.44,.6,0),V3(.34,1.0,0),V3(.22,1.18,0),V3(0,1.2,0)].map(v=>new THREE.Vector2(v.x,v.y)), 28);
+const headGeo = new THREE.SphereGeometry(.36, 28, 20), eyeGeo = new THREE.SphereGeometry(.045, 10, 8);
+function pawn(color, o={}){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(pawnBodyGeo, clay(color)); body.castShadow = body.receiveShadow = true; g.add(body);
+  const head = new THREE.Mesh(headGeo, clay(COL.cream, {r:.7})); head.position.y = 1.5; head.castShadow = true; g.add(head);
+  for (const s of [-1,1]){ const e = new THREE.Mesh(eyeGeo, clay('#1b120c', {r:.3})); e.position.set(s*.12, 1.53, .33); g.add(e); }
+  if (o.scarf){ const sc = new THREE.Mesh(new THREE.TorusGeometry(.25,.09,10,24), clay(COL.mustard)); sc.rotation.x = Math.PI/2; sc.position.y = 1.18; sc.castShadow = true; g.add(sc); }
+  if (o.hat){ const h1 = new THREE.Mesh(new THREE.CylinderGeometry(.3,.36,.18,20), clay(o.hat)); h1.position.y = 1.82; h1.castShadow = true; g.add(h1);
+    const h2 = new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,.04,24), clay(o.hat)); h2.position.y = 1.74; g.add(h2); }
+  g.userData.head = head; g.scale.setScalar(o.s || 1);
+  return g;
+}
+function face(o, x, z){ o.rotation.set(0, Math.atan2(x - o.position.x, z - o.position.z), 0); }
+function box(w,h,d,color,o={}){ const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), o.mat || clay(color,o)); m.castShadow = o.cast ?? true; m.receiveShadow = true; return m; }
+function cyl(rt,rb,h,color,o={}){ const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,o.seg||28), o.mat || clay(color,o)); m.castShadow = o.cast ?? true; m.receiveShadow = true; return m; }
+function base(w, d){   // 微缩台座
+  const g = new THREE.Group();
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w,.5,d), [clay('#6b4a30'),clay('#6b4a30'),new THREE.MeshStandardMaterial({map: tileTex.clone(), roughness:.9}),clay('#6b4a30'),clay('#5e4029'),clay('#5e4029')]);
+  top.material[2].map.repeat.set(w/2.5, d/2.5); top.material[2].map.needsUpdate = true;
+  top.position.y = -.25; top.receiveShadow = true; top.castShadow = true; g.add(top);
+  return g;
+}
+/* 永远面向镜头的贴图牌（气泡、+1、爱心…） */
+function sprite(tex, w, h){ const s = new THREE.Sprite(new THREE.SpriteMaterial({map: tex, transparent: true, depthWrite: false})); s.scale.set(w, h, 1); return s; }
+function bubbleTex(text, o={}){
+  return canvasTex(512, 256, (g,w,h)=>{
+    g.fillStyle = o.bg || '#F3E8CF'; rr(g, 16, 16, w-32, h-70, 60); g.fill();
+    g.beginPath(); g.moveTo(o.right ? w-150 : 120, h-56); g.lineTo(o.right ? w-110 : 90, h-8); g.lineTo(o.right ? w-200 : 180, h-56); g.fill();
+    g.fillStyle = o.fg || '#3A2614'; g.font = `700 ${o.size||84}px ${SERIF}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, w/2, (h-54)/2+8);
+  });
+}
+
+/* ================= 世界 ================= */
+const table = new THREE.Mesh(new THREE.PlaneGeometry(1000, 400), new THREE.MeshStandardMaterial({map: woodTex, roughness: .75, color: '#8a6446'}));
+table.rotation.x = -Math.PI/2; table.position.x = 150; table.receiveShadow = true; scene.add(table);
+
+const SETS = {};   // name → {group, update(t), center}
+
+/* ---------- 场景 A：朋友圈（你独自刷手机 | 隔壁在聚会） ---------- */
+SETS.feed = (()=>{
+  const g = new THREE.Group(); g.position.set(0, 0, 0);
+  const b = base(14, 8); b.position.y = .5; g.add(b);
+  const Y = .5;  // 台面高度
+  // 隔墙
+  const wall = box(.3, 2.6, 8, '#cdb08a'); wall.position.set(0, Y+1.3, 0); g.add(wall);
+  const back = box(14, 3.2, .3, '#c2a07a'); back.position.set(0, Y+1.6, -3.85); g.add(back);
+  // 左：你的房间（沙发 + 落地灯 + 手机）
+  const sofa = new THREE.Group();
+  const s1 = box(3.6, .7, 1.4, '#6d5a7a'); s1.position.y = .35; sofa.add(s1);
+  const s2 = box(3.6, 1.2, .4, '#665373'); s2.position.set(0, .9, -.55); sofa.add(s2);
+  for (const sx of [-1.9, 1.9]){ const a = box(.35, 1.0, 1.4, '#665373'); a.position.set(sx, .5, 0); sofa.add(a); }
+  sofa.position.set(-3.6, Y, -1.6); g.add(sofa);
+  const you = pawn(COL.you, {scarf: true}); you.position.set(-3.6, Y+.7, -1.4); g.add(you);
+  const phone = box(.5, .9, .06, '#1a1410'); phone.position.set(-3.25, Y+.7+1.05, -.95); phone.rotation.set(-.5, -.25, 0); g.add(phone);
+  const glow = new THREE.PointLight('#9fc8ff', 3, 4, 2); glow.position.set(-3.2, Y+2.0, -.6); g.add(glow);
+  const lamp = cyl(.05, .05, 2.6, '#2d2219'); lamp.position.set(-6.2, Y+1.3, -2.8); g.add(lamp);
+  const shade = cyl(.35, .6, .6, '#e9d3a6', {emissive:'#ffcf8a', ei:.25}); shade.position.set(-6.2, Y+2.7, -2.8); g.add(shade);
+  const plant = cyl(.3, .25, .5, '#7a4b2e'); plant.position.set(-1.2, Y+.25, 2.4); g.add(plant);
+  const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(.55, 1), clay(COL.moss)); leaves.position.set(-1.2, Y+.95, 2.4); leaves.castShadow = true; g.add(leaves);
+  // 右：聚会（圆桌 + 6 人 + 彩灯）
+  const tb = cyl(1.7, 1.7, .18, '#e9dcc0'); tb.position.set(3.6, Y+1.0, -.3); g.add(tb);
+  const leg = cyl(.15, .3, 1.0, '#5a3a22'); leg.position.set(3.6, Y+.5, -.3); g.add(leg);
+  const guests = [];
+  for (let i=0;i<6;i++){
+    const a = i/6*Math.PI*2 + .3, p = pawn(PAWN_COLORS[i], {hat: i===2 ? '#C8463A' : undefined});
+    p.position.set(3.6 + Math.cos(a)*2.3, Y, -.3 + Math.sin(a)*2.3); face(p, 3.6, -.3); g.add(p); guests.push(p);
+  }
+  const food = [];
+  for (let i=0;i<7;i++){ const a = i/7*Math.PI*2, f = cyl(.25, .25, .12, ['#c9a248','#a9532e','#97a06a','#efe4cf'][i%4]);
+    f.position.set(3.6 + Math.cos(a)*1.0, Y+1.15, -.3 + Math.sin(a)*1.0); g.add(f); food.push(f); }
+  const cake = cyl(.45, .45, .4, '#f0d9c6'); cake.position.set(3.6, Y+1.3, -.3); g.add(cake);
+  const bulbs = [];
+  for (let i=0;i<14;i++){ const bl = new THREE.Mesh(new THREE.SphereGeometry(.09, 10, 8), clay(['#ffcf6a','#ff8a6a','#9fd0ff'][i%3], {emissive: ['#ffcf6a','#ff8a6a','#9fd0ff'][i%3], ei: 1.5}));
+    bl.position.set(.6 + i*.45, Y+3.1 - Math.sin(i/13*Math.PI)*.6, -3.6); g.add(bl); bulbs.push(bl); }
+  const partyLight = new THREE.PointLight('#ffb36b', 6, 9, 2); partyLight.position.set(3.6, Y+3.4, -.3); g.add(partyLight);
+  // 社交动态：照片卡（+1 / 爱心）从聚会飘向你的手机
+  const heartTex = bubbleTex('♥', {size: 110, fg: '#C8463A'}), plusTex = bubbleTex('+1', {size: 90});
+  const floaters = Array.from({length: 8}, (_,i)=>{ const s = sprite(i%2 ? heartTex : plusTex, .9, .45); g.add(s); return s; });
+  const flashTex = canvasTex(128,128,(c,w,h)=>{ const gr = c.createRadialGradient(64,64,0,64,64,64); gr.addColorStop(0,'rgba(255,250,235,1)'); gr.addColorStop(1,'rgba(255,250,235,0)'); c.fillStyle = gr; c.fillRect(0,0,w,h); });
+  const flash = sprite(flashTex, 3, 3); flash.position.set(4.4, Y+2.4, .8); g.add(flash);
+  return {group: g, center: V3(0, 1, 0), you, label: () => ({you: you.position}),
+    update(t){
+      guests.forEach((p,i)=>{ const bob = Math.abs(Math.sin(t*5 + i*1.3)); p.position.y = Y + bob*.18; p.rotation.z = Math.sin(t*4+i)*.06; });
+      you.rotation.z = Math.sin(t*.8)*.02; you.userData.head.rotation.x = .35;   // 低头看手机
+      bulbs.forEach((bl,i)=> bl.material.emissiveIntensity = 1 + Math.sin(t*6 + i)*.8);
+      glow.intensity = 2.6 + Math.sin(t*9)*.3;
+      floaters.forEach((s,i)=>{ const k = ((t*.55 + i/8) % 1); const p0 = V3(3.6 + Math.cos(i)*1.6, Y+2.2, -.3), p1 = V3(-3.25, Y+2.2, -.9);
+        s.position.lerpVectors(p0, p1, ease(k)); s.position.y += Math.sin(k*Math.PI)*1.6; s.material.opacity = Math.sin(k*Math.PI); });
+      const fk = (t % 1.3) / 1.3; flash.material.opacity = fk < .12 ? 1 - fk/.12 : 0;
+    }};
+})();
+
+/* ---------- 场景 B：群聊（你发言没人回 | 别人一句全员回） ---------- */
+SETS.chat = (()=>{
+  const g = new THREE.Group(); g.position.set(26, 0, 0);
+  const ph = box(7, .5, 11, '#1d1712'); ph.position.y = .25; g.add(ph);
+  const screenTex = canvasTex(512, 800, (c,w,h)=>{ c.fillStyle = '#2f3b35'; c.fillRect(0,0,w,h);
+    c.fillStyle = '#3c4a43'; c.fillRect(0,0,w,70); c.fillStyle = '#d9d2bf'; c.font = `700 34px ${SANS}`; c.textAlign = 'center'; c.fillText('相亲相爱一家人 (32)', w/2, 46); });
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 10.4), new THREE.MeshStandardMaterial({map: screenTex, roughness: .4, emissive: '#2f3b35', emissiveIntensity: .25}));
+  scr.rotation.x = -Math.PI/2; scr.position.y = .51; scr.receiveShadow = true; g.add(scr);
+  const ppl = [];
+  const spots = [[-1.6,2.6],[1.6,2.6],[-2.2,0],[2.2,0],[-1.5,-2.6],[1.5,-2.6],[0,-.4]];
+  spots.forEach(([x,z],i)=>{ const p = pawn(i===0 ? COL.you : PAWN_COLORS[i], {scarf: i===0, hat: i===6 ? '#C8463A' : undefined}); p.position.set(x, .5, z); face(p, 0, 0); g.add(p); ppl.push(p); });
+  const you = ppl[0], star = ppl[6];
+  const youB = sprite(bubbleTex('在吗？'), 2.0, 1.0); g.add(youB);
+  const dots = sprite(bubbleTex('……', {bg:'#cfc6b2', fg:'#7a6c5a'}), 1.5, .75); g.add(dots);
+  const starB = sprite(bubbleTex('出来玩！', {bg:'#F0C987'}), 2.2, 1.1); g.add(starB);
+  const replies = ['好！','我来','+1','哈哈哈','在！','冲'].map((s,i)=>{ const sp = sprite(bubbleTex(s, {right: i%2===0}), 1.5, .75); g.add(sp); return sp; });
+  return {group: g, center: V3(26, 1, 0), you,
+    update(t){
+      // t：场景本地时间（0 起）
+      const ya = vis(t, .2, 3.4, .25, .3); youB.position.set(you.position.x - 1.5, 3.0 + .2*easeOut(seg(t,.2,.5)), you.position.z); youB.material.opacity = ya;
+      dots.position.set(you.position.x - 1.5, 1.9, you.position.z + .4); dots.material.opacity = vis(t, .9, 1.7, .2, .25);
+      you.rotation.z = -.1*ease(seg(t, 1.0, 1.6)); you.userData.head.rotation.x = .3*ease(seg(t, 1.0, 1.6));
+      const sa = ease(seg(t, 1.5, 1.75)); starB.position.set(star.position.x, 3.0 + .3*sa, star.position.z); starB.material.opacity = sa;
+      replies.forEach((sp,i)=>{ const p = ppl[1+i] || ppl[1]; const k = easeOut(seg(t, 1.8 + i*.12, 2.1 + i*.12));
+        sp.position.set(p.position.x, 2.6 + .4*k + (i>4 ? .9 : 0), p.position.z); sp.material.opacity = k; sp.scale.set(1.5*lerp(.5,1,k), .75*lerp(.5,1,k), 1);
+        if (i < 5) p.position.y = .5 + .25*Math.max(0, Math.sin((t-1.8-i*.12)*9))*seg(t, 1.8+i*.12, 2.4+i*.12); });
+    }};
+})();
+
+/* ---------- 场景 C：生日（你的小蛋糕 2 人 | 朋友的大派对） ---------- */
+SETS.bday = (()=>{
+  const g = new THREE.Group(); g.position.set(52, 0, 0);
+  const b = base(14, 8); b.position.y = .5; g.add(b);
+  const Y = .5;
+  const mk = (x, r, n, cakeR, colorYou) => {
+    const tb = cyl(r, r, .16, '#e9dcc0'); tb.position.set(x, Y+.9, 0); g.add(tb);
+    const lg = cyl(.12, .25, .9, '#5a3a22'); lg.position.set(x, Y+.45, 0); g.add(lg);
+    const ck = cyl(cakeR, cakeR, cakeR*.8, '#f2dccb'); ck.position.set(x, Y+.98+cakeR*.4, 0); g.add(ck);
+    const icing = cyl(cakeR*1.02, cakeR*1.02, .08, '#c86a6a'); icing.position.set(x, Y+.98+cakeR*.8, 0); g.add(icing);
+    const flames = [];
+    for (let i=0;i<(cakeR>.6 ? 8 : 3);i++){ const a = i/(cakeR>.6?8:3)*Math.PI*2, cx = x+Math.cos(a)*cakeR*.6, cz = Math.sin(a)*cakeR*.6;
+      const cd = cyl(.035,.035,.35,'#f3e8cf'); cd.position.set(cx, Y+.98+cakeR*.8+.18, cz); g.add(cd);
+      const fl = new THREE.Mesh(new THREE.SphereGeometry(.07,8,6), clay('#ffcf6a',{emissive:'#ffb347', ei:3})); fl.position.set(cx, Y+.98+cakeR*.8+.42, cz); g.add(fl); flames.push(fl); }
+    const ppl = [];
+    for (let i=0;i<n;i++){ const a = i/n*Math.PI*2 + .5, p = pawn(colorYou && i===0 ? COL.you : PAWN_COLORS[(i+3)%8], {scarf: colorYou && i===0, s: .95});
+      p.position.set(x + Math.cos(a)*(r+.75), Y, Math.sin(a)*(r+.75)); face(p, x, 0); g.add(p); ppl.push(p); }
+    const lt = new THREE.PointLight('#ffb35a', cakeR > .6 ? 7 : 2.5, 6, 2); lt.position.set(x, Y+2.6, 0); g.add(lt);
+    return {ppl, flames};
+  };
+  const mine = mk(-3.8, 1.0, 2, .4, true), theirs = mk(3.2, 2.0, 11, .8, false);
+  const conf = [], r = mulberry32(12);
+  for (let i=0;i<60;i++){ const m = new THREE.Mesh(new THREE.PlaneGeometry(.12,.2), clay(['#C8463A','#F0C987','#97A06A','#9fc8ff'][i%4])); m.material.side = THREE.DoubleSide;
+    m.userData = {x: 3.2 + (r()-.5)*5, z: (r()-.5)*4, s: r()*10, v: .5 + r()*.8}; g.add(m); conf.push(m); }
+  return {group: g, center: V3(52, 1, 0), you: mine.ppl[0],
+    update(t){
+      [...mine.flames, ...theirs.flames].forEach((f,i)=> f.scale.setScalar(.85 + .3*Math.abs(Math.sin(t*13 + i))));
+      theirs.ppl.forEach((p,i)=>{ p.position.y = Y + .2*Math.abs(Math.sin(t*5.5 + i)); });
+      conf.forEach(m=>{ const u = m.userData, y = 5 - ((t*u.v + u.s) % 5); m.position.set(u.x + Math.sin(t+u.s)*.3, Y + y, u.z); m.rotation.set(t*3+u.s, t*2+u.s, 0); });
+      mine.ppl[0].userData.head.rotation.x = .25; mine.ppl[0].rotation.z = Math.sin(t*.7)*.02;
+    }};
+})();
+
+
+/* ================= 数据：8 人示意网络 / 1000 人优先连接网络 ================= */
+const G8 = (()=>{
+  const names = ['A','B','C','D','E','F','你','达人'];
+  const pos = [[-3.5,-1.3],[-1.3,-3.5],[1.3,-3.5],[3.5,-1.3],[-1.9,3.2],[1.9,3.2],[0,4.0],[0,0]];
+  const edges = [[7,0],[7,1],[7,2],[7,3],[7,4],[7,5],[0,1],[2,3],[4,6],[5,6]];
+  const nb = names.map(()=>[]); edges.forEach(([a,b])=>{ nb[a].push(b); nb[b].push(a); });
+  const deg = nb.map(l=>l.length);
+  const favg = nb.map(l=>l.reduce((s,j)=>s+deg[j],0)/l.length);
+  const sumD = deg.reduce((a,b)=>a+b,0), sumD2 = deg.reduce((s,d)=>s+d*d,0);
+  const mu = sumD/8, fof = sumD2/sumD, sigma2 = sumD2/8 - mu*mu;
+  const kind = deg.map((d,i)=> favg[i] > d ? 'ok' : favg[i] === d ? 'eq' : 'no');
+  return {names,pos,edges,nb,deg,favg,mu,fof,sigma2,kind,nPar: kind.filter(k=>k==='ok').length};
+})();
+if (G8.mu !== 2.5 || Math.abs(G8.fof-3.2) > 1e-9 || G8.nPar !== 6) throw new Error('G8 数字与字幕不一致');
+const BA = (()=>{
+  const r = mulberry32(77), n = 1000, m = 2, edges = [], rep = [];
+  [[0,1],[1,2],[0,2]].forEach(([a,b])=>{ edges.push([a,b]); rep.push(a,b); });
+  for (let v=3; v<n; v++){ const tg = new Set(); while (tg.size < m) tg.add(rep[Math.floor(r()*rep.length)]);
+    for (const u of tg){ edges.push([v,u]); rep.push(v,u); } }
+  const nb = Array.from({length:n}, ()=>[]); edges.forEach(([a,b])=>{ nb[a].push(b); nb[b].push(a); });
+  const deg = nb.map(l=>l.length), favg = nb.map(l=>l.reduce((s,j)=>s+deg[j],0)/l.length);
+  const par = deg.map((d,i)=>favg[i] > d), nPar = par.filter(Boolean).length;
+  const X = new Float64Array(n), Y = new Float64Array(n);
+  for (let i=0;i<n;i++){ const a = r()*Math.PI*2, d = Math.sqrt(r()); X[i] = Math.cos(a)*d; Y[i] = Math.sin(a)*d; }
+  const k = Math.sqrt(4/n), DX = new Float64Array(n), DY = new Float64Array(n), IT = 140;
+  for (let it=0; it<IT; it++){ DX.fill(0); DY.fill(0);
+    for (let i=0;i<n;i++) for (let j=i+1;j<n;j++){ let dx = X[i]-X[j], dy = Y[i]-Y[j]; const d2 = dx*dx+dy*dy+1e-6, f = k*k/d2;
+      dx*=f; dy*=f; DX[i]+=dx; DY[i]+=dy; DX[j]-=dx; DY[j]-=dy; }
+    for (const [a,b] of edges){ const dx = X[a]-X[b], dy = Y[a]-Y[b], d = Math.sqrt(dx*dx+dy*dy)+1e-9, f = d/k;
+      DX[a]-=dx*f; DY[a]-=dy*f; DX[b]+=dx*f; DY[b]+=dy*f; }
+    const temp = .12*(1-it/IT)+.003;
+    for (let i=0;i<n;i++){ DX[i]-=X[i]*.6; DY[i]-=Y[i]*.6; const d = Math.sqrt(DX[i]*DX[i]+DY[i]*DY[i])+1e-9, s = Math.min(d,temp)/d; X[i]+=DX[i]*s; Y[i]+=DY[i]*s; } }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for (let i=0;i<n;i++){ x0=Math.min(x0,X[i]); x1=Math.max(x1,X[i]); y0=Math.min(y0,Y[i]); y1=Math.max(y1,Y[i]); }
+  const P = Array.from({length:n}, (_,i)=>[((X[i]-x0)/(x1-x0)-.5)*34, ((Y[i]-y0)/(y1-y0)-.5)*19]);
+  return {n, edges, deg, par, nPar, pct: nPar/n*100, P, rank: Array.from({length:n}, ()=>r())};
+})();
+const BA_PCT = BA.pct.toFixed(1);   // 87.9
+
+/* ---------- 通用：毛线（红线连接两人，可按进度"织出来"） ---------- */
+function yarn(a, b, color='#B8463A', o={}){
+  const mid = a.clone().add(b).multiplyScalar(.5); mid.y -= o.sag ?? .25;
+  const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+  const geo = new THREE.TubeGeometry(curve, 40, o.r || .055, 8, false);
+  const mat = new THREE.MeshStandardMaterial({color, roughness: .9, emissive: o.glow || '#000', emissiveIntensity: 0});
+  const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.userData.total = geo.index.count;
+  m.userData.set = k => { geo.setDrawRange(0, Math.floor(m.userData.total * clamp(k,0,1) / 6) * 6); m.visible = k > 0.001; };
+  return m;
+}
+function cardTex(lines, o={}){   // 米白纸卡：lines = [[text, font, color], ...]
+  return canvasTex(o.w || 512, o.h || 256, (g,w,h)=>{
+    g.fillStyle = o.bg || '#F1E6CF'; rr(g, 8, 8, w-16, h-16, 22); g.fill();
+    g.strokeStyle = 'rgba(90,58,34,.25)'; g.lineWidth = 3; rr(g, 20, 20, w-40, h-40, 14); g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    lines.forEach(([s, f, c], i) => { g.font = f; g.fillStyle = c || '#3A2614'; g.fillText(s, w/2, h/(lines.length+1)*(i+1) + (o.dy||0)); });
+  });
+}
+function markTex(text, kind){
+  return canvasTex(560, 200, (g,w,h)=>{
+    g.fillStyle = '#F1E6CF'; rr(g, 8, 8, w-16, h-16, 24); g.fill();
+    g.font = `700 70px ${SERIF}`; g.fillStyle = '#3A2614'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(text, 40, h/2+4);
+    g.lineWidth = 12; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath();
+    const x = w-90, y = h/2;
+    if (kind === 'ok'){ g.strokeStyle = '#B88A2E'; g.moveTo(x-30,y); g.lineTo(x-8,y+24); g.lineTo(x+32,y-26); }
+    else if (kind === 'eq'){ g.strokeStyle = '#8a7a66'; g.moveTo(x-28,y-12); g.lineTo(x+28,y-12); g.moveTo(x-28,y+14); g.lineTo(x+28,y+14); }
+    else { g.strokeStyle = '#C8463A'; g.moveTo(x-26,y-26); g.lineTo(x+26,y+26); g.moveTo(x+26,y-26); g.lineTo(x-26,y+26); }
+    g.stroke();
+  });
+}
+function baseMat(color, noise=.35){
+  const t = canvasTex(512, 512, (g,w,h)=>{ g.fillStyle = color; g.fillRect(0,0,w,h); const r = mulberry32(color.length*7);
+    for (let k=0;k<2200;k++){ g.fillStyle = `rgba(${r()<.5?'30,20,10':'255,240,210'},${r()*noise*.25})`; g.fillRect(r()*w, r()*h, 2+r()*3, 2+r()*3); } });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; return new THREE.MeshStandardMaterial({map: t, roughness: .95});
+}
+function baseWith(w, d, topMat){
+  const g = new THREE.Group(); const side = clay('#5e4029');
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w,.5,d), [side, side, topMat, side, side, side]);
+  topMat.map.repeat.set(w/6, d/6); top.position.y = .25; top.receiveShadow = true; top.castShadow = true; g.add(top); return g;
+}
+
+/* ---------- 场景 D：书桌（1991 论文 + 1961 书） ---------- */
+SETS.desk = (()=>{
+  const g = new THREE.Group(); g.position.set(100, 0, 0);
+  const paperTex = canvasTex(1024, 1320, (c,w,h)=>{
+    c.fillStyle = '#EFE5CF'; c.fillRect(0,0,w,h);
+    const r = mulberry32(5); for (let k=0;k<3000;k++){ c.fillStyle = `rgba(120,90,50,${r()*.08})`; c.fillRect(r()*w, r()*h, 2, 2); }
+    c.fillStyle = '#5a4630'; c.textAlign = 'center'; c.font = `500 30px ${SANS}`; c.letterSpacing = '6px';
+    c.fillText('AMERICAN JOURNAL OF SOCIOLOGY · MAY 1991', w/2, 110); c.letterSpacing = '0px';
+    c.fillRect(90, 140, w-180, 2);
+    c.fillStyle = '#2e2114'; c.font = `italic 500 76px ${GAR}`;
+    c.fillText('Why Your Friends Have More', w/2, 270); c.fillText('Friends Than You Do', w/2, 360);
+    c.font = `500 34px ${SANS}`; c.letterSpacing = '8px'; c.fillText('SCOTT L. FELD', w/2, 450); c.letterSpacing = '0px';
+    for (let i=0;i<20;i++){ c.fillStyle = 'rgba(70,50,30,.22)'; c.fillRect(100, 540+i*34, 360 - r()*60, 12); c.fillRect(560, 540+i*34, 360 - r()*70, 12); }
+    c.fillStyle = '#6a5440'; c.font = `italic 500 34px ${GAR}`; c.textAlign = 'left'; c.fillText('Vol. 96, No. 6 · pp. 1464–1477', 100, 1260);
+  });
+  const paper = new THREE.Mesh(new THREE.PlaneGeometry(6, 7.73), new THREE.MeshStandardMaterial({map: paperTex, roughness: .95}));
+  paper.rotation.x = -Math.PI/2; paper.rotation.z = .06; paper.position.set(-1.2, .02, 0); paper.receiveShadow = true; g.add(paper);
+  const sealTex = canvasTex(512, 256, (c,w,h)=>{ c.strokeStyle = '#B5352A'; c.lineWidth = 14; c.strokeRect(20, 20, w-40, h-40);
+    c.fillStyle = '#B5352A'; c.font = `900 120px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('友谊悖论', w/2, h/2+6); });
+  const seal = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshStandardMaterial({map: sealTex, transparent: true, roughness: .9, depthWrite: false}));
+  seal.rotation.x = -Math.PI/2; seal.rotation.z = .18; g.add(seal);
+  const book = new THREE.Group();
+  const bb = box(4.4, .7, 5.8, '#2B2A44'); bb.position.y = .35; book.add(bb);
+  const coverTex = canvasTex(760, 1000, (c,w,h)=>{ c.fillStyle = '#2B2A44'; c.fillRect(0,0,w,h);
+    c.strokeStyle = '#C9A96A'; c.lineWidth = 6; c.strokeRect(40,40,w-80,h-80);
+    c.fillStyle = '#E0B66A'; c.textAlign = 'center'; c.font = `900 150px ${SERIF}`; c.fillText('1961', w/2, 300);
+    c.fillStyle = '#EFE4CF'; c.font = `600 50px ${SANS}`; c.letterSpacing = '8px'; c.fillText('THE ADOLESCENT', w/2, 470); c.fillText('SOCIETY', w/2, 545); c.letterSpacing = '0px';
+    c.font = `italic 500 56px ${GAR}`; c.fillText('James S. Coleman', w/2, 700); });
+  const cover = new THREE.Mesh(new THREE.PlaneGeometry(4.3, 5.66), new THREE.MeshStandardMaterial({map: coverTex, roughness: .8}));
+  cover.rotation.x = -Math.PI/2; cover.position.y = .71; book.add(cover); g.add(book);
+  const cup = cyl(.7, .6, 1.4, '#E9DCC0'); cup.position.set(-5.6, .7, -2.6); g.add(cup);
+  const coffee = cyl(.62, .62, .02, '#3b2414'); coffee.position.set(-5.6, 1.38, -2.6); g.add(coffee);
+  const pencil = cyl(.08, .08, 5, '#D9A441', {seg: 6}); pencil.rotation.set(0, .5, Math.PI/2); pencil.position.set(2.2, .1, 3.6); g.add(pencil);
+  const lampLight = new THREE.SpotLight('#ffcf94', 60, 30, .7, .6, 1.6); lampLight.position.set(-3, 9, -4); lampLight.target.position.set(0, 0, 0);
+  g.add(lampLight); g.add(lampLight.target);
+  return {group: g, center: V3(100, 0, 0), you: paper,
+    update(t){
+      const sk = seg(t, 19.5, 19.75); seal.visible = t > 19.5;
+      seal.position.set(.3, .05 + (1-easeOut(sk))*2.5, 2.2); seal.scale.setScalar(lerp(1.7, 1, easeOut(sk)));
+      const bk = easeOut(seg(t, 22.3, 23.0));
+      book.position.set(lerp(14, 3.6, bk), (1-bk)*1.2, lerp(-1, -.6, bk)); book.rotation.y = lerp(.5, -.12, bk);
+    }};
+})();
+
+/* ---------- 场景 E：毛毡实验台（8 人 + 红线 + 号码旗） ---------- */
+SETS.net = (()=>{
+  const g = new THREE.Group(); g.position.set(130, 0, 0);
+  g.add(baseWith(19, 13, baseMat('#5d6a47')));
+  const Y = .5, P = G8.pos.map(([x,z]) => V3(x, Y, z));
+  const ppl = P.map((p,i) => { const q = pawn(i===6 ? COL.you : i===7 ? COL.olive : PAWN_COLORS[(i+1)%8],
+      {scarf: i===6, hat: i===7 ? '#C8463A' : undefined, s: i===7 ? 1.15 : 1}); q.position.copy(p); face(q, 0, 9); g.add(q); return q; });
+  const yarns = G8.edges.map(([a,b]) => { const y = yarn(P[a].clone().setY(1.0), P[b].clone().setY(1.0), '#B8463A', {glow: '#E8B04A'}); g.add(y); return y; });
+  const flags = P.map((p,i) => {
+    const f = new THREE.Group();
+    const pole = cyl(.04, .04, 2.8, '#6b4a30'); pole.position.y = 1.4; f.add(pole);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(.08, 10, 8), clay('#D9A441')); knob.position.y = 2.85; f.add(knob);
+    const tex = canvasTex(256, 200, (c,w,h)=>{ c.fillStyle = '#F1E6CF'; c.fillRect(0,0,w,h); c.strokeStyle = '#3A2614'; c.lineWidth = 6; c.strokeRect(10,10,w-20,h-20);
+      c.fillStyle = '#2e2114'; c.font = `700 130px ${GAR}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(G8.deg[i]), w/2, h/2+8); });
+    const card = new THREE.Mesh(new THREE.BoxGeometry(.85, .66, .04), [clay('#e9dcc0'),clay('#e9dcc0'),clay('#e9dcc0'),clay('#e9dcc0'), new THREE.MeshStandardMaterial({map: tex, roughness: .9}), clay('#e9dcc0')]);
+    card.position.set(-.48, 2.4, 0); card.castShadow = true; f.add(card);
+    f.position.set(p.x + .55, Y, p.z - .45); g.add(f); return f; });
+  const marks = P.map((p,i) => { const s = sprite(markTex(`朋友均值 ${G8.favg[i]}`, G8.kind[i]), 2.1, .75); g.add(s); return s; });
+  const lists = P.map((p,i) => { if (i === 7) return null;
+    const names = G8.nb[i].map(j => G8.names[j]);
+    const tex = canvasTex(400, 120 + names.length*90, (c,w,h)=>{ c.fillStyle = '#F1E6CF'; rr(c, 6, 6, w-12, h-12, 18); c.fill();
+      c.fillStyle = '#7a6046'; c.font = `500 44px ${SERIF}`; c.textAlign = 'center'; c.fillText('TA 的好友', w/2, 74);
+      names.forEach((nm, k) => { c.font = `700 62px ${SERIF}`; c.fillStyle = nm === '达人' ? '#B5352A' : '#3A2614'; c.fillText(nm, w/2, 160 + k*86); }); });
+    const s = sprite(tex, 1.1, 1.1*(120 + names.length*90)/400); g.add(s); return s; });
+  // 右侧两根温度计：人均 vs 朋友的人均
+  const thermo = [G8.mu, G8.fof].map((v, i) => {
+    const f = new THREE.Group(); f.position.set(7.4 + i*1.6, Y, -1.5);
+    const frame = box(1.0, 5.2, .5, '#8a6440'); frame.position.y = 2.6; f.add(frame);
+    const inner = box(.7, 4.9, .52, '#2b1d12', {cast: false}); inner.position.y = 2.6; f.add(inner);
+    const fill = box(.62, 1, .56, i ? '#D9A441' : '#C8BBA0', {cast: false}); f.add(fill);
+    for (let k=1;k<=4;k++){ const tick = box(.25, .04, .58, '#e9dcc0', {cast:false}); tick.position.set(-.3, .15 + k*1.2, 0); f.add(tick); }
+    g.add(f); return {f, fill, v}; });
+  return {group: g, center: V3(130, 0, 0), you: ppl[6], ppl, P,
+    update(t){
+      ppl.forEach((q,i)=>{ const k = easeOut(seg(t, 27.3 + i*.12, 27.65 + i*.12)); q.scale.setScalar((i===7 ? 1.15 : 1) * Math.max(.001, k));
+        q.position.y = Y + .12*Math.abs(Math.sin(t*2.2 + i))*seg(t, 28.5, 29); });
+      yarns.forEach((y,j)=>{ y.userData.set(ease(seg(t, 28.2 + j*.1, 28.8 + j*.1)));
+        const [a,b] = G8.edges[j]; const ci = Math.floor((t - 33.2)/.6);
+        const hot = (t >= 33.2 && t < 38.0 && (a === ci || b === ci)) || (t >= 38.4 && t < 46.2 && a === 7);
+        y.material.emissiveIntensity = hot ? .9 : 0; y.material.color.set(hot ? '#E8B04A' : '#B8463A'); });
+      flags.forEach((f,i)=>{ const k = easeOut(seg(t, 30.0 + i*.14, 30.4 + i*.14)); f.scale.set(1, Math.max(.001, k), 1); f.rotation.z = Math.sin(t*1.7 + i)*.02; });
+      marks.forEach((s,i)=>{ const k = easeOut(seg(t, 33.2 + i*.6, 33.5 + i*.6)) * (1 - ease(seg(t, 40.8, 41.2)));
+        s.position.set(P[i].x, 3.25 + (i===7 ? .35 : 0) + (1-k)*.4, P[i].z); s.material.opacity = k;
+        if (t >= 38.2 && t < 41.2) s.material.opacity = i === 7 ? 1 - ease(seg(t, 40.8, 41.2)) : 0;
+        if (i === 7) s.position.y = 3.15; });
+      lists.forEach((s,i)=>{ if (!s) return; const k = easeOut(seg(t, 41.4 + i*.14, 41.7 + i*.14)) * (1 - ease(seg(t, 46.0, 46.4)));
+        s.position.set(P[i].x, 3.4 + (1-k)*.5, P[i].z); s.material.opacity = k; });
+      thermo.forEach(({f, fill, v}, i)=>{ const k = ease(seg(t, 46.6 + i*.9, 47.8 + i*.9)); const hgt = Math.max(.001, v*1.2*k);
+        fill.scale.y = hgt; fill.position.y = .15 + hgt/2; f.visible = t > 46.2; });
+    }};
+})();
+
+/* ---------- 场景 F：公式板（墙 + 壁灯 + 木框黑板） ---------- */
+SETS.board = (()=>{
+  const g = new THREE.Group(); g.position.set(160, 0, 0);
+  const wall = box(30, 14, .4, '#3a2a1e'); wall.position.set(0, 7, -2.4); g.add(wall);
+  for (const sx of [-6.5, 6.5]){ const sc = cyl(.3, .45, .7, '#2b1d12'); sc.position.set(sx, 7.6, -2.0); g.add(sc);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(.22, 12, 10), clay('#ffe0a8', {emissive: '#ffd08a', ei: 3})); bulb.position.set(sx, 7.25, -1.95); g.add(bulb);
+    const pl = new THREE.PointLight('#ffcf8a', 14, 12, 1.6); pl.position.set(sx, 7, -1.2); g.add(pl); }
+  const frame = box(12, 7, .35, '#8a6440'); frame.position.set(0, 4.6, 0); g.add(frame);
+  const slate = box(11.2, 6.2, .38, '#2c3329', {cast: false}); slate.position.set(0, 4.6, 0); g.add(slate);
+  for (const sx of [-4.5, 4.5]){ const leg = box(.3, 1.4, .3, '#6b4a30'); leg.position.set(sx, .7, 0); g.add(leg); }
+  const chalk = (txt, font, h) => canvasTex(2048, h, (c,w,hh)=>{ c.fillStyle = '#F1E6CF'; c.font = font; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, w/2, hh/2); });
+  const rows = [
+    [chalk('朋友的平均朋友数  =  μ  +  σ² / μ', `900 118px ${SERIF}`, 300), 1.6, 5.9],
+    [chalk('μ：平均朋友数        σ²：人和人之间的差异（方差）', `500 74px ${SERIF}`, 160), .86, 4.75],
+    [chalk(`${G8.mu}  +  ${G8.sigma2} ÷ ${G8.mu}  =  ${G8.fof.toFixed(1)}`, `700 140px ${GAR}`, 280), 1.5, 3.65],
+    [chalk('只要 σ² > 0，右边一定比 μ 大', `500 84px ${SERIF}`, 160), .86, 2.55],
+  ].map(([tex, hh, y]) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 10.4 * tex.image.height / 2048), new THREE.MeshBasicMaterial({map: tex, transparent: true}));
+    m.position.set(0, y, .2); g.add(m); return m; });
+  rows[2].material.color.set('#F0C987');
+  return {group: g, center: V3(160, 3, 0), you: slate,
+    update(t){ rows.forEach((m,i)=>{ const k = ease(seg(t, [50.3, 51.6, 53.6, 55.0][i], [50.3, 51.6, 53.6, 55.0][i] + .5)); m.material.opacity = k; m.position.x = (1-k)*-.4; }); }};
+})();
+
+/* ---------- 场景 G：千人人群（实例化） ---------- */
+SETS.crowd = (()=>{
+  const g = new THREE.Group(); g.position.set(220, 0, 0);
+  const lowBody = new THREE.LatheGeometry([[0,0],[.46,0],[.5,.08],[.44,.6],[.34,1.0],[.22,1.18],[0,1.2]].map(([x,y])=>new THREE.Vector2(x,y)), 8);
+  const lowHead = new THREE.SphereGeometry(.36, 8, 6);
+  const TILES = [[0,0],[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]], TW = 38, TD = 23, N = BA.n * TILES.length;
+  const bodies = new THREE.InstancedMesh(lowBody, new THREE.MeshStandardMaterial({color: '#ffffff', roughness: .9}), N);
+  const heads = new THREE.InstancedMesh(lowHead, new THREE.MeshStandardMaterial({color: COL.cream, roughness: .8}), N);
+  bodies.castShadow = heads.castShadow = true; bodies.receiveShadow = true; g.add(bodies); g.add(heads);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(TW*3.2, TD*3.4), baseMat('#6a5a40')); ground.material.map.repeat.set(16, 12);
+  ground.rotation.x = -Math.PI/2; ground.position.y = .01; ground.receiveShadow = true; g.add(ground);
+  const lp = new Float32Array(BA.edges.length*6);
+  BA.edges.forEach(([a,b],i)=>{ lp.set([BA.P[a][0], .55, BA.P[a][1], BA.P[b][0], .55, BA.P[b][1]], i*6); });
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(lp, 3));
+  const lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({color: '#C9573F', transparent: true, opacity: .35})); g.add(lines);
+  const base = new THREE.Color('#8C8576'), gold = new THREE.Color('#E0A93E'), tmp = new THREE.Color(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), T = new THREE.Vector3();
+  const rr2 = mulberry32(404), tileRank = Array.from({length: N}, ()=>rr2()), tilePar = Array.from({length: N}, (_,i)=> i < BA.n ? BA.par[i] : rr2() < .88);
+  return {group: g, center: V3(220, 0, 0), you: lines,
+    update(t){
+      let i = 0;
+      TILES.forEach(([tx,tz], ti)=>{
+        const ka = ti === 0 ? 1 : easeOut(seg(t, 64.6 + ti*.18, 65.3 + ti*.18));
+        for (let k=0; k<BA.n; k++, i++){
+          const appear = ti === 0 ? easeOut(seg(t, 57.0 + 1.6*k/BA.n, 57.3 + 1.6*k/BA.n)) : ka;
+          const sc = .34 * Math.max(.001, appear) * (ti === 0 ? 1 + Math.min(BA.deg[k], 30)*.012 : 1);
+          T.set(BA.P[k][0] + tx*TW, 0, BA.P[k][1] + tz*TD); S.setScalar(sc); M.compose(T, Q, S); bodies.setMatrixAt(i, M);
+          T.y = 1.5*sc; M.compose(T, Q, S); heads.setMatrixAt(i, M);
+          const r = ti === 0 ? BA.rank[k] : tileRank[i];
+          const gk = (ti === 0 ? BA.par[k] : tilePar[i]) ? ease(seg(t, 58.8 + 3.0*r, 59.1 + 3.0*r)) : 0;
+          bodies.setColorAt(i, tmp.copy(base).lerp(gold, gk));
+        }
+      });
+      bodies.instanceMatrix.needsUpdate = heads.instanceMatrix.needsUpdate = true; bodies.instanceColor.needsUpdate = true;
+      lines.material.opacity = .35 * ease(seg(t, 57.6, 58.6)) * (1 - .6*ease(seg(t, 64, 66)));
+    }};
+})();
+
+/* ---------- 场景 H：哈佛草坪（流感） ---------- */
+SETS.campus = (()=>{
+  const g = new THREE.Group(); g.position.set(300, 0, 0);
+  g.add(baseWith(24, 15, baseMat('#6f8a4c', .5)));
+  const Y = .5;
+  const path = box(2.2, .02, 15, '#c9b48e', {cast: false}); path.position.set(0, Y+.01, 0); g.add(path);
+  [[-7.5,'#A4573E'],[0,'#B98A64'],[7.5,'#A4573E']].forEach(([x,c],i)=>{
+    const b = box(5, 3 + (i===1 ? 1 : 0), 2.6, c); b.position.set(x, Y + (3 + (i===1?1:0))/2, -5.6); g.add(b);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.9, 1.6, 4), clay('#4f3a2c')); roof.rotation.y = Math.PI/4; roof.scale.set(1, 1, .55);
+    roof.position.set(x, Y + 3 + (i===1?1:0) + .8, -5.6); roof.castShadow = true; g.add(roof);
+    for (let w=0; w<3; w++){ const win = box(.6, .8, .05, '#ffd99a', {emissive: '#ffcf80', ei: .6, cast: false}); win.position.set(x - 1.5 + w*1.5, Y + 1.8, -4.28); g.add(win); } });
+  const trees = [[-10.5, 4], [10.5, 4.5], [-10.8, -2], [10.6, -1.6]].map(([x,z])=>{ const tr = cyl(.18, .24, 1.4, '#5a3a22'); tr.position.set(x, Y+.7, z); g.add(tr);
+    const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 1), clay(COL.moss)); cr.position.set(x, Y+2.1, z); cr.castShadow = true; g.add(cr); return cr; });
+  const r = mulberry32(2009);
+  const mk = (cx, n, palette, startT) => Array.from({length: n}, (_,i)=>{
+    const a = r()*Math.PI*2, d = Math.sqrt(r())*2.6;
+    const q = pawn(palette[i % palette.length], {s: .8, hat: (palette !== GREYS && i === 3) ? '#C8463A' : undefined});
+    q.children[0].material = q.children[0].material.clone();
+    q.position.set(cx + Math.cos(a)*d*1.2, Y, 1.6 + Math.sin(a)*d*.8); face(q, cx*.3, 9); g.add(q);
+    q.userData.base = new THREE.Color(palette[i % palette.length]); q.userData.t0 = startT + i*.05; q.userData.sick = r(); return q; });
+  const GREYS = ['#8C8576', '#9a9282', '#7f786a'];
+  const rand = mk(-5.2, 12, GREYS, 70.3), frs = mk(5.2, 14, PAWN_COLORS, 73.2);
+  const links = rand.slice(0, 7).map((q,i)=>{ const f = frs[(i*2) % frs.length];
+    const y = yarn(q.position.clone().setY(1.1), f.position.clone().setY(1.1), '#E0B66A', {sag: -.8, r: .04}); g.add(y); return y; });
+  const sickC = new THREE.Color('#9DB05A');
+  const thermo = [0, 1].map(i=>{ const f = new THREE.Group(); f.position.set(-1.0 + i*2.0, Y, -3.2);
+    const frame = box(1.2, 5.6, .5, '#8a6440'); frame.position.y = 2.8; f.add(frame);
+    const inner = box(.86, 5.3, .52, '#2b1d12', {cast: false}); inner.position.y = 2.8; f.add(inner);
+    const fill = box(.78, 1, .56, i ? '#D9A441' : '#C8463A', {cast: false}); f.add(fill); g.add(f); return {f, fill}; });
+  const sneeze = canvasTex(128, 128, (c)=>{ c.fillStyle = 'rgba(200,220,170,.9)'; for (const [x,y,rd] of [[50,64,26],[78,54,22],[80,82,20]]){ c.beginPath(); c.arc(x,y,rd,0,7); c.fill(); } });
+  const puffs = [...rand, ...frs].map(q => { const s = sprite(sneeze, .7, .7); g.add(s); return s; });
+  // 应用：随机挑一人（灰）→ 沿金线找到他的朋友（戴红帽的枢纽）
+  const hub = frs[3], pick = rand[9];
+  const app = yarn(pick.position.clone().setY(1.2), hub.position.clone().setY(1.2), '#F0C987', {sag: -1.6, r: .07, glow: '#F0C987'}); app.material.emissiveIntensity = .8; g.add(app);
+  return {group: g, center: V3(300, 0, 0), you: pick, hub, pick,
+    update(t){
+      const all = [...rand, ...frs];
+      all.forEach((q,i)=>{ const k = easeOut(seg(t, q.userData.t0, q.userData.t0 + .3)); q.scale.setScalar(.8*Math.max(.001,k));
+        // 发病时间：朋友组早于随机组（示意）
+        const isF = i >= rand.length, s0 = (isF ? 76.0 : 76.8) + q.userData.sick*2.2;
+        const sk = ease(seg(t, s0, s0 + .4)); q.children[0].material.color.copy(q.userData.base).lerp(sickC, sk*.85);
+        q.rotation.z = sk > .5 ? Math.sin(t*9 + i)*.05 : 0;
+        const p = puffs[i], pk = seg(t, s0 + .1, s0 + .9); p.visible = pk > 0 && pk < 1;
+        p.position.set(q.position.x + .5, Y + 1.6 + pk*.7, q.position.z + .3); p.material.opacity = Math.sin(pk*Math.PI); });
+      links.forEach((y,i)=> y.userData.set(ease(seg(t, 73.6 + i*.12, 74.3 + i*.12)) * (1 - ease(seg(t, 75.6, 76)))));
+      thermo.forEach(({f, fill}, i)=>{ const k = ease(seg(t, i ? 76.0 : 76.8, (i ? 76.0 : 76.8) + 2.4)); const h = Math.max(.001, 5.0*k); fill.scale.y = h; fill.position.y = .15 + h/2; f.visible = t > 75.6; });
+      app.userData.set(ease(seg(t, 80.2, 81.0)));
+      hub.position.y = Y + (t > 80.9 ? .3*Math.abs(Math.sin((t-80.9)*6))*(1-seg(t, 81.6, 82)) : 0);
+      trees.forEach((c,i)=> c.rotation.y = Math.sin(t*.8 + i)*.08);
+    }};
+})();
+
+/* 落点：三场景里的人头顶都冒出"?" */
+const THOUGHT = canvasTex(256, 256, (c,w,h)=>{ c.fillStyle = '#F1E6CF'; c.beginPath(); c.arc(128, 110, 92, 0, 7); c.fill();
+  c.beginPath(); c.arc(70, 210, 18, 0, 7); c.fill(); c.beginPath(); c.arc(44, 240, 10, 0, 7); c.fill();
+  c.fillStyle = '#3A2614'; c.font = `900 130px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', 128, 118); });
+const THOUGHTS = [];
+['feed','chat','bday'].forEach(name => SETS[name].group.traverse(o => { if (o.userData && o.userData.head && o.parent === SETS[name].group){
+  const s = sprite(THOUGHT, 1.5, 1.5); s.position.set(.5, 2.7, 0); s.material.opacity = 0; o.add(s); THOUGHTS.push(s); } }));
+
+Object.values(SETS).forEach(s => scene.add(s.group));
+
+/* ================= 时间轴 ================= */
+const DURATION = 96;
+const SUBS = [
+  [0.15, 3.3,  '刷朋友圈，别人总在<em>聚会</em>；'],
+  [3.4, 6.5,   '在群里说话，<em>没人</em>接茬；'],
+  [6.6, 9.7,   '过个生日，人家的祝福<em>刷了屏</em>。'],
+  [9.8, 12.9,  '你是不是也觉得：大家都比你<em>受欢迎</em>？'],
+  [16.6, 19.4, '1991年，社会学家费尔德发表了一篇论文：'],
+  [19.4, 22.3, '《为什么你的朋友比你朋友多》'],
+  [22.3, 24.8, '他翻出1961年的高中友谊调查，'],
+  [24.8, 27.2, '多数人的朋友，确实比自己<em>受欢迎</em>。'],
+  [27.3, 30.0, '做个实验：8个人，10段友谊；'],
+  [30.0, 33.1, '牌子上，是每个人的朋友数。'],
+  [33.1, 35.7, '再看看：朋友们平均有几个朋友？'],
+  [35.7, 38.2, '8个人里，<red>6</red>个人的朋友比自己多。'],
+  [38.2, 41.0, '例外只有一个：中间的「社交达人」。'],
+  [41.0, 43.6, '他有<em>6</em>个朋友，就出现在<em>6</em>份好友名单里；'],
+  [43.6, 46.2, '越受欢迎，越常出现在「你的朋友」里。'],
+  [46.2, 50.0, '人均<em>2.5</em>个朋友，朋友的人均却有<red>3.2</red>个。'],
+  [50.2, 53.5, '只要每个人的朋友数不一样多，'],
+  [53.5, 56.9, '朋友的平均朋友数，就一定<em>高于平均</em>。'],
+  [57.0, 60.5, '放大到一千人的网络：'],
+  [60.5, 64.0, `<red>${BA_PCT}%</red> 的人，朋友比自己受欢迎。`],
+  [64.0, 67.0, '2011年，研究者分析了<em>7.21亿</em> Facebook 用户：'],
+  [67.0, 70.0, '绝大多数人的朋友，都比自己朋友多。'],
+  [70.1, 73.1, '2009年哈佛：随机找了<em>319</em>个学生，'],
+  [73.1, 76.0, '再让他们说出朋友——又得到<em>425</em>人。'],
+  [76.0, 79.4, '结果，朋友组的流感，早来了约<red>两周</red>。'],
+  [79.4, 82.5, '想最早发现疫情？别挑人，挑「<em>他的朋友</em>」。'],
+  [82.6, 85.6, '所以，下次觉得朋友都比你受欢迎——'],
+  [85.6, 88.8, '别难过：<em>大多数人</em>，都这么觉得。'],
+  [89.0, 96.0, '你觉得，你是图里的<em>哪个点</em>？'],
+];
+const ALL3 = ['feed','chat','bday'];
+const WIDE_P = V3(26, 46, 62), WIDE_L = V3(26, 0, 0);
+/* 镜头：{t0, t1, sets, p:[起,止], l:[起,止], focus, blur, band, fade, out(用 easeOut)} */
+const SHOTS = [
+  {t0: 0,    t1: 3.4,  sets: ['feed'], p: [V3(4.8, 3.4, 5.6), V3(.5, 8.5, 14.5)], l: [V3(3.6, 1.4, -.3), V3(-.6, 1.2, -.6)], out: true},
+  {t0: 3.4,  t1: 6.6,  sets: ['chat'], p: [V3(26, 16, 8), V3(26.6, 12.5, 6.5)], l: [V3(26, .5, .3), V3(26, .8, .3)], blur: 3.5, band: .24},
+  {t0: 6.6,  t1: 9.8,  sets: ['bday'], p: [V3(46.5, 5.5, 9), V3(53.5, 7.5, 13)], l: [V3(48.5, 1.6, 0), V3(52.4, 1.4, 0)]},
+  {t0: 9.8,  t1: 13.0, sets: ALL3, p: [V3(52, 14, 26), WIDE_P], l: [V3(52, 1, 0), WIDE_L], wide: true},
+  {t0: 13.0, t1: 16.5, sets: ALL3, p: [WIDE_P, V3(30, 40, 56)], l: [WIDE_L, WIDE_L], wide: true, blur: 16, band: 0, fade: .5},
+  {t0: 16.5, t1: 22.3, sets: ['desk'], p: [V3(99, 13, 9.5), V3(99.4, 11.5, 8.2)], l: [V3(99, 0, -.2), V3(99.2, 0, .3)], focus: .5, blur: 4, band: .22},
+  {t0: 22.3, t1: 27.2, sets: ['desk'], p: [V3(101, 13.5, 11), V3(101.6, 12.5, 9.8)], l: [V3(101, 0, 0), V3(101.4, 0, .2)], focus: .5, blur: 4, band: .22},
+  {t0: 27.2, t1: 33.1, sets: ['net'], p: [V3(130, 15, 16), V3(130, 11.5, 12.6)], l: [V3(130, .6, 0), V3(130, 1, .3)], out: true, blur: 4.5, band: .2},
+  {t0: 33.1, t1: 38.2, sets: ['net'], p: [V3(129.4, 12, 13.4), V3(130.8, 11, 12.2)], l: [V3(130, 1.4, .3), V3(130.2, 1.4, .3)], blur: 4, band: .24},
+  {t0: 38.2, t1: 41.0, sets: ['net'], p: [V3(131.2, 6.2, 7.4), V3(130.6, 5.4, 6.2)], l: [V3(130, 2.2, 0), V3(130, 2.3, 0)], focus: .5, blur: 6},
+  {t0: 41.0, t1: 46.2, sets: ['net'], p: [V3(130.5, 11, 13.5), V3(129.5, 11.5, 13)], l: [V3(130, 1.8, .3), V3(130, 2.0, .3)], blur: 4, band: .24},
+  {t0: 46.2, t1: 50.0, sets: ['net'], p: [V3(134, 7, 14), V3(135, 6.6, 12.4)], l: [V3(137.6, 3.0, -1.5), V3(138, 3.0, -1.5)], focus: .52, blur: 5, band: .2},
+  {t0: 50.0, t1: 57.0, sets: ['board'], p: [V3(158.6, 5.2, 18.5), V3(160.4, 4.8, 15.5)], l: [V3(159.6, 4.4, 0), V3(160.2, 4.4, 0)], blur: 4, band: .3, focus: .55},
+  {t0: 57.0, t1: 64.0, sets: ['crowd'], p: [V3(222, 6, 17), V3(220, 22, 25)], l: [V3(220, 0, 0), V3(220, 0, 0)], wide: true},
+  {t0: 64.0, t1: 70.0, sets: ['crowd'], p: [V3(220, 22, 25), V3(220, 72, 62)], l: [V3(220, 0, 0), V3(220, 0, -4)], wide: true, out: true},
+  {t0: 70.0, t1: 76.0, sets: ['campus'], p: [V3(300, 12, 18), V3(300, 9.5, 14.5)], l: [V3(300, 1, 0), V3(300, 1.2, .5)], out: true},
+  {t0: 76.0, t1: 79.4, sets: ['campus'], p: [V3(300, 8.5, 15), V3(300, 7.8, 13.2)], l: [V3(300, 3.2, -2.5), V3(300, 3.3, -2.5)], focus: .55, blur: 5, band: .22},
+  {t0: 79.4, t1: 82.5, sets: ['campus'], p: [V3(300, 12.5, 17.5), V3(300.2, 11.5, 16)], l: [V3(300, 1.4, 1.2), V3(300.1, 1.6, 1.2)], blur: 4, band: .24},
+  {t0: 82.5, t1: 88.8, sets: ALL3, p: [V3(-2, 4.6, 6.4), WIDE_P], l: [V3(-3.6, 1.6, -1.4), WIDE_L], wide: true},
+  {t0: 88.8, t1: 96.0, sets: ALL3, p: [WIDE_P, V3(26, 40, 56)], l: [WIDE_L, WIDE_L], wide: true, blur: 16, band: 0, fade: .42},
+];
+const TICKS = [[0.4, '朋友圈都在聚会'], [3.9, '群里没人接话'], [7.1, '生日冷冷清清']];
+const CHECK = ['共鸣', '悖论', '原理', '应用'], CHECK_T = [16.3, 50.0, 57.0, 82.5];
+/* 右上角：[起, 止, 大字(斜体), 小字] */
+const CORNER = [
+  [16.6, 22.3, 'AJS · 1991', '费尔德 · 论文'],
+  [22.3, 27.2, 'Coleman · 1961', '高中友谊调查'],
+  [33.4, 38.2, null, '朋友比自己受欢迎', 'n8'],
+  [46.6, 50.0, '2.5 < 3.2', '人均 vs 朋友的人均'],
+  [57.4, 64.0, null, '朋友比自己受欢迎', 'pct'],
+  [64.0, 70.0, 'Facebook · 2011', '7.21 亿活跃用户'],
+  [70.2, 79.4, 'Harvard · 2009', 'H1N1 · 流感季'],
+  [79.4, 82.5, 'Cohen et al. · 2003', '熟人免疫策略'],
+];
+/* 音效：[秒, 类型, 音量] —— sfx.py 读取 */
+const SFX = [
+  [0.0, 'party', .55], [0.0, 'buzz', .7], [0.5, 'whoosh', .5], [0.9, 'shutter', .5], [1.6, 'pop', .4], [2.2, 'shutter', .45], [2.7, 'pop', .4],
+  [0.4, 'tick', .7], [3.35, 'whoosh', .7], [3.6, 'send', .8], [3.9, 'tick', .7], [4.3, 'crickets', .55],
+  [4.9, 'send', .8], [5.2, 'pop', .55], [5.32, 'pop', .55], [5.44, 'pop', .55], [5.56, 'pop', .55], [5.68, 'pop', .55], [5.8, 'pop', .55],
+  [6.55, 'whoosh', .7], [6.6, 'party', .5], [7.1, 'tick', .7], [9.75, 'whoosh', .9], [10.6, 'riser', .5], [13.0, 'boom', .8],
+  [16.4, 'whoosh', .7], [16.8, 'paper', .6], [19.5, 'stamp', 1.0], [22.3, 'slide', .8], [23.0, 'thud', .6],
+  [27.15, 'whoosh', .7], ...Array.from({length: 8}, (_,i)=>[27.3 + i*.12, 'pop', .45]), [28.2, 'yarn', .5],
+  ...Array.from({length: 8}, (_,i)=>[30.0 + i*.14, 'tick', .5]),
+  ...Array.from({length: 8}, (_,i)=>[33.3 + i*.6, G8.kind[i] === 'ok' ? 'ding' : G8.kind[i] === 'eq' ? 'tick' : 'buzzer', .6]),
+  [38.2, 'whoosh', .6], [41.4, 'paper', .5], ...Array.from({length: 7}, (_,i)=>[41.45 + i*.14, 'pop', .4]),
+  [46.2, 'whoosh', .6], [46.6, 'fill', .6], [47.5, 'fill', .6], [48.8, 'ding', .7],
+  [50.0, 'whoosh', .7], [50.3, 'chalk', .6], [51.6, 'chalk', .5], [53.6, 'chalk', .6], [54.1, 'ding', .7], [55.0, 'chalk', .5],
+  [57.0, 'whoosh', .7], [57.0, 'crowd', .5], [58.8, 'shimmer', .6], [61.8, 'ding', .7], [64.0, 'riser', .6], [64.6, 'crowd', .6],
+  [70.0, 'whoosh', .7], [70.3, 'pop', .4], [70.6, 'pop', .4], [70.9, 'pop', .4], [73.2, 'pop', .4], [73.5, 'pop', .4], [73.6, 'yarn', .5],
+  [76.0, 'sneeze', .5], [76.4, 'fill', .6], [76.9, 'sneeze', .45], [77.3, 'fill', .6], [77.7, 'sneeze', .45], [78.6, 'ding', .7],
+  [79.4, 'whoosh', .6], [80.2, 'yarn', .6], [80.95, 'ding', .8],
+  [82.5, 'whoosh', .8], [85.2, 'pop', .4], [85.5, 'pop', .4], [85.8, 'pop', .4], [86.1, 'pop', .4], [88.8, 'boom', .6],
+];
+window.SFX_CUES = SFX;
+
+/* ================= 叠加层 ================= */
+const $ = id => document.getElementById(id);
+function spans(zh){ let out = '', cls = '';
+  for (const part of zh.split(/(<em>|<\/em>|<red>|<\/red>)/)){
+    if (part === '<em>'){ cls = 'em'; continue; } if (part === '<red>'){ cls = 'red'; continue; }
+    if (part === '</em>' || part === '</red>'){ cls = ''; continue; }
+    for (const ch of part) out += `<span class="ch ${cls}">${ch === ' ' ? '&nbsp;' : ch}</span>`; }
+  return out; }
+let curSub = null, curCheck = null, curCorner = null, curTitle = null;
+function overlay(t){
+  const sub = SUBS.find(([a,b]) => t >= a && t < b), el = $('subtitle');
+  if (sub){ if (curSub !== sub){ el.innerHTML = spans(sub[2]); curSub = sub; }
+    el.style.opacity = 1 - ease(seg(t, sub[1]-.2, sub[1]));
+    el.querySelectorAll('.ch').forEach((s,i)=>{ const k = easeOut(seg(t, sub[0]+i*.03, sub[0]+i*.03+.22));
+      s.style.opacity = k; s.style.transform = `translateY(${(1-k)*16}px)`; });
+  } else { el.innerHTML = ''; curSub = null; }
+  // 左上：开场"今日扎心"，之后"检查单"
+  let html = '';
+  if (t < 13){
+    const n = TICKS.filter(([s]) => t >= s).length;
+    if (n) html = `<div class="head">今日扎心 <i>×${n}</i></div>` + TICKS.slice(0,n).map(([,s],i)=>`<div class="row" style="opacity:${i===n-1?1:.55}"><div class="box x"></div>${s}</div>`).join('');
+  } else if (t >= CHECK_T[0] && t < 88.8){
+    const done = CHECK_T.filter(x => t >= x).length;
+    html = `<div class="head">友谊悖论 · 检查单 <i>${Math.min(done,4)}/4</i></div>` + CHECK.map((s,i)=>{
+      const st = i < done ? 'on' : '', cur = i === done ? 'cur' : '';
+      return `<div class="row ${cur}" style="opacity:${i < done || i === done ? 1 : .5}"><div class="box ${st}"></div>${s}</div>`; }).join('');
+  }
+  if (html !== curCheck){ $('check').innerHTML = html; curCheck = html; }
+  $('check').style.opacity = t < 13 ? 1 - ease(seg(t, 12.4, 13)) : ease(seg(t, CHECK_T[0], CHECK_T[0]+.5)) * (1 - ease(seg(t, 88.3, 88.8)));
+  // 右上角
+  const c = CORNER.find(([a,b]) => t >= a && t < b);
+  let a = '', b = '';
+  if (c){ a = c[2]; b = c[3];
+    if (c[4] === 'n8'){ let n = 0; for (let i=0;i<8;i++) if (t >= 33.3 + i*.6 && G8.kind[i] === 'ok') n++; a = `${n} / 8`; }
+    if (c[4] === 'pct'){ let n = 0; for (let k=0;k<BA.n;k++) if (BA.par[k] && t >= 58.95 + 3.0*BA.rank[k]) n++; a = `${(n/BA.n*100).toFixed(1)}%`; } }
+  const key2 = a + '|' + b;
+  if (key2 !== curCorner){ $('corner').querySelector('.a').textContent = a; $('corner').querySelector('.b').textContent = b; curCorner = key2; }
+  $('corner').style.opacity = c ? ease(seg(t, c[0], c[0]+.35)) * (1 - ease(seg(t, c[1]-.25, c[1]))) : 0;
+  // 标题卡 & 片尾卡
+  const tt = $('title');
+  if (t >= 13.1 && t < 16.5){
+    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, 13.1, 13.5)) * (1 - ease(seg(t, 16.1, 16.5)));
+    if (curTitle !== 'title'){ tt.innerHTML = `<div class="s">VIBE知识大赏</div><div class="n">${spans('《你的朋友，比你受欢迎》')}</div><div class="q">为什么你总觉得，自己朋友最少？</div>`; curTitle = 'title'; }
+    tt.querySelectorAll('.n .ch').forEach((s,i)=>{ const k = easeOut(seg(t, 13.2 + i*.05, 13.55 + i*.05)); s.style.opacity = k; s.style.transform = `translateY(${(1-k)*30}px)`; });
+    tt.querySelector('.q').style.opacity = ease(seg(t, 14.0, 14.5));
+  } else if (t >= 89.0){
+    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, 89.0, 89.6));
+    if (curTitle !== 'end'){ tt.innerHTML = `<div class="n" style="font-size:84px">@Leo 出品</div><div class="refs">
+      S. L. Feld, "Why Your Friends Have More Friends Than You Do," <i>AJS</i> 96(6), 1991<br>
+      N. A. Christakis &amp; J. H. Fowler, "Social Network Sensors for Early Detection of Contagious Outbreaks," <i>PLoS ONE</i>, 2010<br>
+      J. Ugander, B. Karrer, L. Backstrom &amp; C. Marlow, "The Anatomy of the Facebook Social Graph," arXiv:1111.4503, 2011<br>
+      R. Cohen, S. Havlin &amp; D. ben-Avraham, "Efficient Immunization Strategies…," <i>PRL</i> 91, 247901, 2003</div>
+      <div class="note">本片网络与人物均为示意模型 · 统计数字由程序实算</div>`; curTitle = 'end'; }
+  } else { tt.style.display = 'none'; }
+}
+/* 3D 标签（带引线） */
+const labEls = {};
+function label(id, worldPos, text, a, cls=''){
+  let e = labEls[id]; if (!e){ e = document.createElement('div'); $('labels').appendChild(e); labEls[id] = e; }
+  e.className = 'lab ' + cls;
+  if (a <= .01 || !worldPos){ e.style.opacity = 0; return; }
+  const p = worldPos.clone().project(camera);
+  if (e.textContent !== text) e.textContent = text; e.style.opacity = a;
+  e.style.left = ((p.x+1)/2*W) + 'px'; e.style.top = ((1-p.y)/2*H) + 'px';
+}
+const wp = (o, dy=0) => { const v = new THREE.Vector3(); o.getWorldPosition(v); v.y += dy; return v; };
+function labels(t, sh){
+  const L = [];
+  if (sh.sets[0] === 'feed' && sh.sets.length === 1) L.push(['you', wp(SETS.feed.you, 2.25), '你', seg(t, 1.4, 1.9)]);
+  if (sh.sets[0] === 'chat') L.push(['you', wp(SETS.chat.you, 2.25), '你', 1]);
+  if (sh.sets[0] === 'bday') L.push(['you', wp(SETS.bday.you, 2.15), '你', 1]);
+  if (sh.wide && sh.sets === ALL3 && t < 12.2) L.push(['you', wp(SETS.bday.you, 2.15), '你', 1 - seg(t, 11.4, 12.1)]);
+  if (t >= 82.5 && t < 84.6) L.push(['you', wp(SETS.feed.you, 2.25), '你', 1 - seg(t, 83.8, 84.5)]);
+  if (sh.sets[0] === 'net'){
+    L.push(['you', wp(SETS.net.ppl[6], 2.25), '你', seg(t, 28.4, 28.9) * (1 - seg(t, 32.9, 33.2)) + (t > 41 ? seg(t, 41.2, 41.6) * 0 : 0)]);
+    if (t >= 46.6){ L.push(['th1', V3(137.4, 5.9, -1.5), '人均 2.5', seg(t, 47.6, 48.0), 'small']); L.push(['th2', V3(139.0, 5.9, -1.5), '朋友的人均 3.2', seg(t, 48.5, 48.9), 'small gold']); }
+  }
+  if (sh.sets[0] === 'campus'){
+    L.push(['g1', V3(294.8, 2.7, 1.6), '随机学生 319', t < 76 ? seg(t, 70.6, 71.0) : 0, 'small']);
+    L.push(['g2', V3(305.2, 2.7, 1.6), '被点名的朋友 425', t < 76 ? seg(t, 73.5, 73.9) : 0, 'small gold']);
+    if (t >= 76 && t < 79.4){ L.push(['th1', V3(299.0, 6.6, -3.2), '随机', seg(t, 76.2, 76.6), 'small']); L.push(['th2', V3(301.0, 6.6, -3.2), '朋友', seg(t, 76.2, 76.6), 'small gold']);
+      L.push(['early', V3(303.6, 4.6, -3.2), '早约两周', seg(t, 77.6, 78.0), 'gold']); }
+    if (t >= 79.4){ L.push(['pick', wp(SETS.campus.pick, 1.9), '随机挑一人', seg(t, 79.6, 80.0), 'small']); L.push(['hub2', wp(SETS.campus.hub, 2.1), 'TA的朋友：枢纽', seg(t, 80.9, 81.3), 'small gold']); }
+  }
+  const used = new Set();
+  for (const [id, pos, text, a, cls] of L){ label(id, pos, text, a, cls); used.add(id); }
+  for (const id in labEls) if (!used.has(id)) labEls[id].style.opacity = 0;
+}
+
+/* ================= 帧入口 ================= */
+function shotAt(t){ for (const s of SHOTS) if (t >= s.t0 && t < s.t1) return s; return SHOTS[SHOTS.length-1]; }
+const SET_T0 = {chat: 3.4};
+window.render = function(t){
+  const sh = shotAt(t), raw = seg(t, sh.t0, sh.t1), k = sh.out ? easeOut(raw) : ease(raw);
+  camera.position.lerpVectors(sh.p[0], sh.p[1], k);
+  // 切镜后 0.5 秒的推入落定 + 轻微手持感
+  const settle = 1 - easeOut(seg(t, sh.t0, sh.t0 + .5));
+  const look = new THREE.Vector3().lerpVectors(sh.l[0], sh.l[1], k);
+  camera.position.add(V3(Math.sin(t*.7)*.05, Math.cos(t*.53)*.04, 0)).lerp(look, -.05*settle);
+  camera.lookAt(look);
+  for (const [name, set] of Object.entries(SETS)){
+    set.group.visible = sh.sets.includes(name);
+    if (set.group.visible) set.update(t - (SET_T0[name] || 0) + (name === 'chat' ? 0 : 0));
+  }
+  THOUGHTS.forEach((s,i)=>{ const kk = easeOut(seg(t, 85.1 + (i%13)*.08, 85.4 + (i%13)*.08)) * (t < 88.8 ? 1 : 1); s.material.opacity = t >= 85 ? kk : 0; s.scale.setScalar(1.5*Math.max(.001, kk)); });
+  const c = sh.wide && sh.sets === ALL3 ? V3(26, 0, 0) : SETS[sh.sets[0]].center;
+  const sz = sh.wide ? (sh.sets[0] === 'crowd' ? 70 : 50) : 16;
+  key.position.set(c.x + 9, 22, c.z + 12); key.target.position.copy(c);
+  if (key.shadow.camera.right !== sz){ key.shadow.camera.left = -sz; key.shadow.camera.right = sz; key.shadow.camera.top = sz; key.shadow.camera.bottom = -sz; key.shadow.camera.far = 120; key.shadow.camera.updateProjectionMatrix(); }
+  camera.updateMatrixWorld();
+  post(sh.focus ?? .5, sh.band ?? (sh.wide ? .1 : .14), sh.blur ?? (sh.wide ? 9 : 7), t, sh.fade ?? 1);
+  labels(t, sh);
+  overlay(t);
+};
+window.setup = function(done){
+  const text = document.documentElement.innerHTML + SUBS.map(s=>s[2]).join('');
+  const faces = ['500 20px "Noto Serif SC"','700 20px "Noto Serif SC"','900 20px "Noto Serif SC"','500 20px "Noto Sans SC"','700 20px "Noto Sans SC"','italic 500 20px "EB Garamond"','500 20px "EB Garamond"','700 20px "EB Garamond"'];
+  Promise.all(faces.map(f => document.fonts.load(f, text).catch(()=>null))).then(() => document.fonts.ready).then(() => {
+    TEXDRAW.forEach(j => j()); done && done(); });
+};
+window.DURATION = DURATION;
+window.STATS = {g8: {mu: G8.mu, fof: G8.fof, nPar: G8.nPar}, ba: {pct: BA_PCT}};
+let t0 = performance.now();
+(function loop(){ if (window.__RENDER_MODE__) return; window.render(((performance.now()-t0)/1000) % DURATION); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
