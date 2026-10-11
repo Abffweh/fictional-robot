@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!--
+  《你的朋友，比你受欢迎》· Vibe知识大赏风格 · @Leo
+  基于 .claude/skills/vibe-knowledge-video/assets/template.html
+  架构: 纯时间函数渲染。window.render(t) 画出第 t 秒的画面；随机数固定种子，无帧间状态。
+  片中数字（2.5 / 3.2 / 6 of 8 / 千人网络比例）全部由下方代码现场计算。
+-->
+<title>你的朋友，比你受欢迎</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700;900&family=EB+Garamond:ital@0;1&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0A0A1E; }
+  #stage { position: relative; width: 1920px; height: 1080px; background: #0A0A1E; }
+  .layer { position: absolute; inset: 0; }
+  #bg { z-index: 1; } #scene { z-index: 10; }
+
+  #watermark { position: absolute; top: 40px; left: 56px; z-index: 30;
+    font: 500 26px 'Noto Sans SC'; color: rgba(234,234,242,.45); letter-spacing: 2px; }
+  #toplabel { position: absolute; top: 44px; left: 0; right: 0; z-index: 30;
+    text-align: center; font: 500 30px 'Noto Sans SC'; color: #8A8AA0; letter-spacing: 6px; }
+  #annotation { position: absolute; top: 756px; left: 0; right: 0; z-index: 30;
+    text-align: center; font: 400 27px 'Noto Sans SC'; color: #8A8AA0; }
+
+  #subtitle { position: absolute; top: 906px; left: 0; right: 0; z-index: 40; text-align: center;
+    font: 700 46px 'Noto Sans SC'; color: #EAEAF2; letter-spacing: 1px;
+    text-shadow: 0 2px 24px rgba(0,0,0,.8); }
+  #subtitle em { font-style: normal; color: #C9A96A; }
+  #subtitle-en { position: absolute; top: 972px; left: 0; right: 0; z-index: 40; text-align: center;
+    font: italic 400 26px 'EB Garamond', serif; color: #8A8AA0; letter-spacing: .5px; }
+
+  #titlecard { position: absolute; inset: 0; z-index: 50; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 26px; }
+  #titlecard .series { font: 500 24px 'Noto Sans SC'; color: rgba(201,169,106,.75); letter-spacing: 14px; text-indent: 14px; }
+  #titlecard .name   { font: 900 104px 'Noto Serif SC', serif; color: #C9A96A; letter-spacing: 6px;
+    text-shadow: 0 4px 40px rgba(201,169,106,.25); }
+  #titlecard .q      { font: 500 34px 'Noto Sans SC'; color: #EAEAF2; margin-top: 14px; }
+  #titlecard .q-en   { font: italic 400 26px 'EB Garamond', serif; color: #8A8AA0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bg" class="layer" width="1920" height="1080"></canvas>
+  <canvas id="scene" class="layer" width="1920" height="1080"></canvas>
+  <div id="watermark">@Leo</div>
+  <div id="toplabel"></div>
+  <div id="annotation"></div>
+  <div id="subtitle"></div>
+  <div id="subtitle-en"></div>
+  <div id="titlecard">
+    <div class="series">VIBE知识大赏</div>
+    <div class="name"></div>
+    <div class="q"></div>
+    <div class="q-en"></div>
+  </div>
+</div>
+
+<script>
+/* ================= 配置区 ================= */
+const CFG = { duration: 140, fps: 30, topic: '友谊悖论' };
+const GOLD = '#C9A96A', INK = '#EAEAF2', DIM = '#8A8AA0', PAPER = '#EDE4D3', BROWN = '#3A2E20', RED = '#B53A2F';
+const SANS = "'Noto Sans SC', sans-serif", SERIF = "'Noto Serif SC', serif", GAR = "'EB Garamond', serif";
+
+/* 旁白字幕: [起秒, 止秒, 中文, 英文] */
+const SUBTITLES = [
+  [0.3, 3.5,  '你有没有觉得，身边的人都比你<em>受欢迎</em>？', 'Ever feel like everyone around you is more popular?'],
+  [3.5, 7,    '他们朋友更多，聚会更多，消息更多', 'More friends. More parties. More messages.'],
+  [7, 10.5,   '这不是你的<em>错觉</em>', "It's not just in your head."],
+  [10.5, 13.8,'在数学上，这几乎是<em>注定</em>的', "Mathematically, it's almost guaranteed."],
+  [20.2, 23.5,'<em>1991</em>年，社会学家斯科特·费尔德发表了一篇论文', 'In 1991, sociologist Scott Feld published a paper.'],
+  [23.5, 27,  '标题直白得有点扎心', 'Its title was painfully honest:'],
+  [27, 31,    '「为什么你的朋友比你朋友多」', '"Why Your Friends Have More Friends Than You Do"'],
+  [31, 35,    '他翻出一份<em>1961</em>年的高中友谊调查', 'He revisited a 1961 survey of high-school friendships.'],
+  [35, 39,    '多数人的朋友，都比自己<em>受欢迎</em>', "Most people's friends were more popular than they were."],
+  [39.2, 45,  '先做一个小实验', "Let's run a small experiment."],
+  [45, 48.5,  '8个人，平均每人<em>2.5</em>个朋友', '8 people. 2.5 friends each, on average.'],
+  [48.5, 52,  '让每个人看看：朋友平均有几个朋友', 'Each one asks: how many friends do my friends have?'],
+  [52, 56,    '8个人里，<em>6</em>个人的朋友比自己多', 'For 6 of the 8, their friends have more friends.'],
+  [56, 59.5,  '唯一的例外，是中间那个「社交达人」', 'The one exception: the hub in the middle.'],
+  [59.5, 63,  '问题出在哪？', "So what's going on?"],
+  [63, 67,    '他有<em>6</em>个朋友，就出现在<em>6</em>份好友名单里', "With 6 friends, he's on 6 friend lists."],
+  [67, 71,    '朋友少的人，只被数了两次', 'Those with fewer friends are counted just twice.'],
+  [71, 75,    '越受欢迎的人，越常出现在「你的朋友」里', 'The more popular, the more often they\'re "your friend."'],
+  [75, 79,    '只要每个人的朋友数不一样多', 'As long as people differ in how many friends they have,'],
+  [79, 83,    '朋友的平均朋友数，就一定<em>高于平均</em>', 'the average friend beats the average person.'],
+  [83, 87,    '把人数放大到<em>一千人</em>', 'Now scale it up to a thousand people.'],
+  [87, 91,    '结论依然成立', 'The pattern holds.'],
+  [91, 95,    '<em>2011</em>年，研究者分析了7.21亿 Facebook 用户', 'In 2011, researchers mapped 721 million Facebook users.'],
+  [95, 99,    '<em>绝大多数</em>人的朋友，都比自己朋友多', 'For most of them, their friends had more friends.'],
+  [99, 103,   '还有一个反直觉的细节：', "Here's one more counterintuitive twist:"],
+  [103, 107,  '<em>2009</em>年哈佛，研究者让学生说出自己的朋友', 'Harvard, 2009: students were asked to name their friends.'],
+  [107, 111,  '被点名的朋友，早约<em>两周</em>得流感', 'Those friends caught the flu about two weeks earlier.'],
+  [111, 115,  '受欢迎，意味着最先接触到一切', 'Being popular means being first to everything.'],
+  [115, 119,  '想找到枢纽？别挑人，挑「<em>他的朋友</em>」', "To find the hubs, don't pick a person. Pick their friend."],
+  [119, 123,  '所以下次觉得自己朋友最少时', 'So next time you feel you have the fewest friends,'],
+  [123, 127,  '记住：你看到的，本就是被放大的样本', "remember: you're seeing a biased sample."],
+  [127, 131,  '<em>大多数人</em>，都和你一样这么觉得', 'Most people feel exactly the same way.'],
+  [131, 135,  '数学告诉你：这不是你的问题', "The math says: it's not you."],
+  [135, 140,  '你觉得，你是图里的<em>哪个点</em>？', 'Which dot do you think you are?'],
+];
+
+const TITLE_CARD = [14, 20, '《你的朋友，比你受欢迎》', '为什么你总觉得自己朋友最少？', 'Why Your Friends Have More Friends Than You Do'];
+
+/* 章节: [起秒, 顶标签, 画面注释] */
+const SECTIONS = [
+  [0,    '', ''],
+  [20,   '1991 · 美国社会学期刊', '论文首页为示意 · S. L. Feld, American Journal of Sociology 96(6), 1991'],
+  [31,   '1961 · 高中友谊调查', '书影为示意 · J. S. Coleman, The Adolescent Society, 1961'],
+  [39,   '一个小实验 · An experiment', ''],
+  [45,   '一个小实验 · An experiment', '示意图：8 个人，10 段友谊；徽章数字 = 他有几个朋友'],
+  [49,   '一个小实验 · An experiment', '每个人比一比：自己的朋友数 vs 朋友们的平均朋友数'],
+  [56,   '一个小实验 · An experiment', '「达人」有 6 个朋友，而他的朋友们平均只有 2 个'],
+  [59.5, '一个小实验 · An experiment', ''],
+  [63,   '被数了几次 · Counted how often', '一个人出现在别人好友名单里的次数 = 他的朋友数'],
+  [71,   '被数了几次 · Counted how often', '统计「朋友的朋友数」时，达人一个人就被算了 6 次'],
+  [75,   '背后的数学 · The math', ''],
+  [79,   '背后的数学 · The math', '上面那张示意网络：μ = 2.5，σ² = 1.75'],
+  [83,   '放大到一千人 · 1,000 people', '示意：1000 人优先连接网络（Barabási–Albert 模型），比例为程序实算'],
+  [91,   '2011 · FACEBOOK', 'J. Ugander, B. Karrer, L. Backstrom & C. Marlow, The Anatomy of the Facebook Social Graph (2011)'],
+  [99,   '还有一个细节 · One more twist', ''],
+  [103,  '2009 · 哈佛 · H1N1', 'N. A. Christakis & J. H. Fowler, PLoS ONE 5(9): e12948 (2010)'],
+  [107,  '2009 · 哈佛 · H1N1', '曲线为示意：被点名的朋友组，流感流行曲线整体提前约两周'],
+  [115,  '找到枢纽 · Finding the hubs', '熟人免疫策略 · R. Cohen, S. Havlin & D. ben-Avraham, Phys. Rev. Lett. 91, 247901 (2003)'],
+  [119,  '', ''],
+];
+
+/* ================= 工具函数 ================= */
+const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+const lerp  = (a,b,t)=>a+(b-a)*t;
+const ease  = t => t<.5 ? 2*t*t : 1-((-2*t+2)**2)/2;
+const easeOut = t => 1-(1-t)**3;
+const seg = (t,a,b) => clamp((t-a)/(b-a), 0, 1);
+/* 区间 [a,b] 内可见，淡入 fi 秒、淡出 fo 秒 */
+const vis = (t,a,b,fi=.6,fo=.6) => Math.min(ease(seg(t,a,a+fi)), 1-ease(seg(t,b-fo,b)));
+function mulberry32(seed){ return function(){ let t = seed += 0x6D2B79F5;
+  t = Math.imul(t ^ t>>>15, t|1); t ^= t + Math.imul(t ^ t>>>7, t|61);
+  return ((t ^ t>>>14)>>>0)/4294967296; }; }
+const fmt = x => Number.isInteger(x) ? String(x) : x.toFixed(1);
+
+function T(c, s, x, y, font, color, align='center', a=1, spacing=0){
+  if (a <= 0.001) return;
+  c.save(); c.globalAlpha *= a; c.font = font; c.fillStyle = color;
+  c.textAlign = align; c.textBaseline = 'middle';
+  if (spacing) c.letterSpacing = spacing + 'px';
+  c.fillText(s, x, y); c.restore();
+}
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+/* 纸卡（以当前原点为中心） */
+function paper(c, w, h){
+  c.save();
+  c.shadowColor = 'rgba(0,0,0,.55)'; c.shadowBlur = 30; c.shadowOffsetY = 10;
+  c.fillStyle = PAPER; roundRect(c, -w/2, -h/2, w, h, 6); c.fill();
+  c.shadowColor = 'transparent';
+  c.strokeStyle = 'rgba(58,46,32,.12)'; c.lineWidth = 1.5;
+  roundRect(c, -w/2+10, -h/2+10, w-20, h-20, 4); c.stroke();
+  c.restore();
+}
+function seal(c, x, y, text, k){
+  if (k <= 0) return;
+  c.save(); c.translate(x, y); c.rotate(-.12); c.scale(lerp(1.6,1,easeOut(k)), lerp(1.6,1,easeOut(k)));
+  c.globalAlpha *= k;
+  c.font = `700 28px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  const w = c.measureText(text).width + 26;
+  c.strokeStyle = 'rgba(181,58,47,.92)'; c.lineWidth = 3; c.strokeRect(-w/2, -24, w, 48);
+  c.fillStyle = 'rgba(181,58,47,.9)'; c.fillText(text, 0, 1);
+  c.restore();
+}
+
+/* ================= 图元 ================= */
+function drawNode(c, x, y, r, label, o={}){
+  const a = o.a ?? 1; if (a <= 0.001) return;
+  c.save(); c.globalAlpha *= a;
+  if (o.glow > 0){
+    const gc = o.gc || '201,169,106';
+    const g = c.createRadialGradient(x,y,r*.6, x,y,r*2.8);
+    g.addColorStop(0, `rgba(${gc},${.5*o.glow})`); g.addColorStop(1, `rgba(${gc},0)`);
+    c.fillStyle = g; c.beginPath(); c.arc(x,y,r*2.8,0,Math.PI*2); c.fill();
+  }
+  c.fillStyle = o.fill || '#14142E'; c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill();
+  c.lineWidth = o.lw || 2.5; c.strokeStyle = o.stroke || 'rgba(234,234,242,.85)'; c.stroke();
+  if (label){
+    c.fillStyle = o.lc || INK; c.font = o.font || `700 ${Math.round(r*.62)}px ${SANS}`;
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(label, x, y+1);
+  }
+  c.restore();
+}
+function drawBadge(c, x, y, txt, o={}){
+  const a = o.a ?? 1; if (a <= 0.001) return;
+  c.save(); c.globalAlpha *= a;
+  c.font = `700 ${o.size||22}px ${SANS}`;
+  const w = Math.max(34, c.measureText(txt).width + 22), h = (o.size||22) + 12;
+  c.fillStyle = '#0A0A1E'; roundRect(c, x-w/2, y-h/2, w, h, h/2); c.fill();
+  c.strokeStyle = o.col || GOLD; c.lineWidth = 2; c.stroke();
+  c.fillStyle = o.col || GOLD; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(txt, x, y+1);
+  c.restore();
+}
+/* 判定标记：ok=金色对勾 / eq=灰色等号 / no=红色叉 */
+function drawMark(c, x, y, kind, a){
+  if (a <= 0.001) return;
+  c.save(); c.globalAlpha *= a; c.lineWidth = 3.5; c.lineCap = 'round'; c.lineJoin = 'round';
+  c.beginPath();
+  if (kind === 'ok'){ c.strokeStyle = GOLD; c.moveTo(x-9,y); c.lineTo(x-3,y+7); c.lineTo(x+10,y-8); }
+  else if (kind === 'eq'){ c.strokeStyle = DIM; c.moveTo(x-9,y-4); c.lineTo(x+9,y-4); c.moveTo(x-9,y+5); c.lineTo(x+9,y+5); }
+  else { c.strokeStyle = '#D8584A'; c.moveTo(x-8,y-8); c.lineTo(x+8,y+8); c.moveTo(x+8,y-8); c.lineTo(x-8,y+8); }
+  c.stroke(); c.restore();
+}
+function drawEdge(c, p, q, prog, col, a, w){
+  if (prog <= 0 || a <= 0.001) return;
+  c.save(); c.strokeStyle = `rgba(${col},${a})`; c.lineWidth = w; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(lerp(p[0],q[0],prog), lerp(p[1],q[1],prog)); c.stroke();
+  c.restore();
+}
+
+/* ================= 数据：8 人示意网络 ================= */
+const G8 = (()=>{
+  const names = ['A','B','C','D','E','F','你','达人'];
+  const ang = [200,250,290,340,120,60];
+  const pos = ang.map(a=>[960+230*Math.cos(a*Math.PI/180), 400+230*Math.sin(a*Math.PI/180)]);
+  pos.push([960,640]); pos.push([960,400]);
+  const edges = [[7,0],[7,1],[7,2],[7,3],[7,4],[7,5],[0,1],[2,3],[4,6],[5,6]];
+  const nb = names.map(()=>[]); edges.forEach(([a,b])=>{ nb[a].push(b); nb[b].push(a); });
+  const deg = nb.map(l=>l.length);
+  const favg = nb.map(l=>l.reduce((s,j)=>s+deg[j],0)/l.length);
+  const sumD = deg.reduce((a,b)=>a+b,0), sumD2 = deg.reduce((s,d)=>s+d*d,0);
+  const mu = sumD/8, fof = sumD2/sumD, sigma2 = sumD2/8 - mu*mu;
+  const kind = deg.map((d,i)=> favg[i] > d ? 'ok' : favg[i] === d ? 'eq' : 'no');
+  const nPar = kind.filter(k=>k==='ok').length;
+  return {names,pos,edges,nb,deg,favg,mu,fof,sigma2,kind,nPar};
+})();
+/* 字幕里写死的数字必须和计算一致 */
+if (G8.mu !== 2.5 || Math.abs(G8.fof-3.2) > 1e-9 || G8.nPar !== 6 || G8.edges.length !== 10)
+  throw new Error('G8 数字与字幕不一致');
+function gpos(i, tf){ const [x,y] = G8.pos[i]; return [x + Math.sin(tf*.7+i*1.7)*3, y + Math.cos(tf*.6+i*2.1)*3]; }
+
+/* ================= 数据：1000 人优先连接网络 ================= */
+const BA = (()=>{
+  const r = mulberry32(77), n = 1000, m = 2;
+  const edges = [], rep = [];
+  [[0,1],[1,2],[0,2]].forEach(([a,b])=>{ edges.push([a,b]); rep.push(a,b); });
+  for (let v=3; v<n; v++){
+    const tg = new Set();
+    while (tg.size < m) tg.add(rep[Math.floor(r()*rep.length)]);
+    for (const u of tg){ edges.push([v,u]); rep.push(v,u); }
+  }
+  const nb = Array.from({length:n}, ()=>[]);
+  edges.forEach(([a,b])=>{ nb[a].push(b); nb[b].push(a); });
+  const deg = nb.map(l=>l.length);
+  const favg = nb.map(l=>l.reduce((s,j)=>s+deg[j],0)/l.length);
+  const par = deg.map((d,i)=>favg[i] > d);
+  const nPar = par.filter(Boolean).length;
+  const sumD = deg.reduce((a,b)=>a+b,0), sumD2 = deg.reduce((s,d)=>s+d*d,0);
+  const mu = sumD/n, fof = sumD2/sumD;
+  /* Fruchterman–Reingold 布局（固定种子，加载时算一次） */
+  const X = new Float64Array(n), Y = new Float64Array(n);
+  for (let i=0;i<n;i++){ const a = r()*Math.PI*2, d = Math.sqrt(r()); X[i] = Math.cos(a)*d; Y[i] = Math.sin(a)*d; }
+  const k = Math.sqrt(4/n), DX = new Float64Array(n), DY = new Float64Array(n);
+  const ITER = 140;
+  for (let it=0; it<ITER; it++){
+    DX.fill(0); DY.fill(0);
+    for (let i=0;i<n;i++) for (let j=i+1;j<n;j++){
+      let dx = X[i]-X[j], dy = Y[i]-Y[j], d2 = dx*dx+dy*dy + 1e-6;
+      const f = k*k/d2; dx*=f; dy*=f; DX[i]+=dx; DY[i]+=dy; DX[j]-=dx; DY[j]-=dy;
+    }
+    for (const [a,b] of edges){
+      const dx = X[a]-X[b], dy = Y[a]-Y[b], d = Math.sqrt(dx*dx+dy*dy)+1e-9, f = d/k;
+      DX[a]-=dx*f; DY[a]-=dy*f; DX[b]+=dx*f; DY[b]+=dy*f;
+    }
+    const temp = .12*(1-it/ITER)+.003;
+    for (let i=0;i<n;i++){
+      DX[i] -= X[i]*.6; DY[i] -= Y[i]*.6;           // 向心力，保持紧凑
+      const d = Math.sqrt(DX[i]*DX[i]+DY[i]*DY[i])+1e-9, s = Math.min(d,temp)/d;
+      X[i] += DX[i]*s; Y[i] += DY[i]*s;
+    }
+  }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for (let i=0;i<n;i++){ x0=Math.min(x0,X[i]); x1=Math.max(x1,X[i]); y0=Math.min(y0,Y[i]); y1=Math.max(y1,Y[i]); }
+  const P = Array.from({length:n}, (_,i)=>[960 + ((X[i]-x0)/(x1-x0)-.5)*960, 430 + ((Y[i]-y0)/(y1-y0)-.5)*500]);
+  const rank = Array.from({length:n}, ()=>r());
+  const rad = deg.map(d=>1.6 + Math.sqrt(d)*1.25);
+  /* 落点段：挑 26 个"觉得朋友比自己多"的普通人冒气泡 */
+  const bubbles = [];
+  for (let i=n-1; i>=0 && bubbles.length<26; i-=37) if (par[i]) bubbles.push(i);
+  return {n,edges,deg,favg,par,nPar,mu,fof,P,rank,rad,bubbles};
+})();
+
+/* 开场：你 + 6 个朋友（数字为示意） */
+const HOOK = (()=>{
+  const r = mulberry32(5), F = [128, 86, 203, 154, 97, 176];
+  const fr = F.map((v,i)=>{
+    const a = (i*60-90)*Math.PI/180, x = 960+Math.cos(a)*250, y = 430+Math.sin(a)*190;
+    const n = 7 + Math.round(v/30);
+    const dots = Array.from({length:n}, (_,j)=>{
+      const aa = a + (r()-.5)*1.5, d = 70 + r()*90;
+      return {x: x+Math.cos(aa)*d, y: y+Math.sin(aa)*d*.8, s: r()};
+    });
+    return {v, x, y, dots};
+  });
+  return {fr, you: 41};
+})();
+
+/* ================= 背景层 ================= */
+const bg = document.getElementById('bg'), bgc = bg.getContext('2d');
+const rndBG = mulberry32(20261009);
+const STARS = Array.from({length: 110}, () => ({x: rndBG()*1920, y: rndBG()*1080, r: rndBG()*1.4+.3, p: rndBG()*Math.PI*2}));
+function drawBG(t){
+  const g = bgc.createRadialGradient(960,480,100, 960,480,1200);
+  g.addColorStop(0, '#0F0F28'); g.addColorStop(1, '#050510');
+  bgc.fillStyle = g; bgc.fillRect(0,0,1920,1080);
+  for (const s of STARS){
+    const a = .2 + .35*Math.abs(Math.sin(t*.7 + s.p));
+    bgc.fillStyle = `rgba(234,234,242,${a})`;
+    bgc.fillRect(s.x + Math.sin(t*.05+s.p)*6, s.y, s.r, s.r);
+  }
+}
+
+/* ================= 场景 ================= */
+const sc = document.getElementById('scene'), c = sc.getContext('2d');
+
+/* ① 开场钩子 / ⑤ 落点复现。lt=剧情时间，tf=浮动时间 */
+function drawHook(c, lt, tf){
+  const you = [960, 430];
+  HOOK.fr.forEach((f,i)=>{
+    const k = easeOut(seg(lt, .9+i*.25, 1.5+i*.25));
+    if (k <= 0) return;
+    const fx = f.x + Math.sin(tf*.8+i)*3, fy = f.y + Math.cos(tf*.7+i)*3;
+    // 朋友的朋友（小点）
+    const dk = seg(lt, 3.4+i*.12, 6.6);
+    f.dots.forEach((d,j)=>{
+      const kk = ease(clamp(dk*f.dots.length - j*.7, 0, 1));
+      if (kk <= 0) return;
+      drawEdge(c, [fx,fy], [d.x,d.y], kk, '234,234,242', .22, 1.2);
+      c.fillStyle = `rgba(234,234,242,${.55*kk})`;
+      c.beginPath(); c.arc(d.x + Math.sin(tf+d.s*9)*2, d.y, 3.2 + d.s*2, 0, Math.PI*2); c.fill();
+    });
+    drawEdge(c, you, [fx,fy], k, '234,234,242', .5, 2.2);
+    const glow = ease(seg(lt, 7, 8.5)) * (.7 + .3*Math.sin(tf*2.2+i));
+    drawNode(c, fx, fy, 30*lerp(.6,1,k), '', {a:k, glow, stroke: 'rgba(201,169,106,.9)'});
+    const bv = Math.round(f.v * ease(seg(lt, 3.5+i*.1, 6.5)));
+    drawBadge(c, fx+30, fy-34, String(bv), {a: ease(seg(lt, 3.4, 3.9))});
+  });
+  const yk = easeOut(seg(lt, .2, 1));
+  const dimYou = 1 - .3*ease(seg(lt, 7, 9));
+  drawNode(c, you[0], you[1], 38*lerp(.6,1,yk), '你', {a: yk*dimYou, font: `700 26px ${SANS}`});
+  drawBadge(c, you[0]+36, you[1]-42, String(HOOK.you), {a: ease(seg(lt, 2, 2.6))*dimYou, col: DIM});
+}
+function sceneHook(t){
+  const a = vis(t, 0, 14, .1, .8); if (a <= 0) return;
+  const s = 1 + .12*ease(seg(t, 10.5, 14));
+  c.save(); c.globalAlpha = a;
+  c.translate(960,420); c.scale(s,s); c.translate(-960,-420);
+  drawHook(c, t, t);
+  c.restore();
+}
+
+/* ② 历史锚点：论文首页 + 书影 */
+function sceneDocs(t){
+  const a = vis(t, 20, 39, .9, .7); if (a <= 0) return;
+  const kin = easeOut(seg(t, 20, 21.4));
+  const mv = ease(seg(t, 31, 32.6));
+  // 论文首页
+  c.save(); c.globalAlpha = a;
+  c.translate(lerp(960, 600, mv), lerp(455+60*(1-kin), 440, mv));
+  c.rotate(lerp(-.02, -.045, mv)); c.scale(lerp(1, .78, mv), lerp(1, .78, mv));
+  paper(c, 820, 500);
+  T(c, 'MAY 1991 · AMERICAN JOURNAL OF SOCIOLOGY', 0, -200, `500 17px ${SANS}`, 'rgba(58,46,32,.7)', 'center', 1, 4);
+  c.fillStyle = 'rgba(58,46,32,.35)'; c.fillRect(-340, -178, 680, 1.5);
+  T(c, 'Why Your Friends Have More', 0, -128, `italic 500 46px ${GAR}`, BROWN);
+  T(c, 'Friends Than You Do', 0, -76, `italic 500 46px ${GAR}`, BROWN);
+  // 27–31 金色下划线
+  const ul = ease(seg(t, 27.2, 28.6));
+  if (ul > 0){ c.fillStyle = 'rgba(201,169,106,.95)';
+    c.fillRect(-255, -101, 510*ul, 3); c.fillRect(-190, -49, 380*ul, 3); }
+  T(c, 'SCOTT L. FELD', 0, -14, `600 20px ${SANS}`, 'rgba(58,46,32,.85)', 'center', 1, 5);
+  const rr = mulberry32(31);
+  for (let i=0; i<7; i++){
+    const w1 = 300 - rr()*60, w2 = 300 - rr()*80;
+    c.fillStyle = 'rgba(58,46,32,.16)';
+    c.fillRect(-340, 34+i*22, w1, 7); c.fillRect(30, 34+i*22, w2, 7);
+  }
+  T(c, 'Vol. 96, No. 6 · pp. 1464–1477', -340, 212, `italic 400 19px ${GAR}`, 'rgba(58,46,32,.6)', 'left');
+  seal(c, 270, 172, '友谊悖论', seg(t, 24, 24.6));
+  c.restore();
+
+  // 书影：1961 高中友谊调查
+  const bk = easeOut(seg(t, 31.6, 33));
+  if (bk > 0){
+    c.save(); c.globalAlpha = a*bk;
+    c.translate(1330, 440 + 40*(1-bk)); c.rotate(.035);
+    paper(c, 540, 470);
+    c.fillStyle = '#2B2A44'; c.fillRect(-250, -215, 500, 92);
+    T(c, '1961', 0, -186, `900 34px ${SERIF}`, GOLD);
+    T(c, 'THE ADOLESCENT SOCIETY', 0, -145, `600 19px ${SANS}`, INK, 'center', 1, 4);
+    T(c, 'James S. Coleman', 0, -98, `italic 400 24px ${GAR}`, BROWN);
+    // 小型友谊网络（墨点）
+    const rr2 = mulberry32(61), pts = [];
+    for (let i=0;i<26;i++) pts.push([-200 + rr2()*400, -50 + rr2()*240]);
+    const ed = [];
+    for (let i=0;i<26;i++){ const j = (i*7+3)%26, k2 = (i*11+5)%26; ed.push([i,j]); if (i%3===0) ed.push([i,k2]); ed.push([i, i<6 ? (i+1)%6 : i%6]); }
+    const ep = seg(t, 32.6, 35.6);
+    ed.forEach(([u,v],j)=>{
+      const kk = clamp(ep*ed.length - j*.6, 0, 1);
+      if (kk > 0) drawEdge(c, pts[u], pts[v], kk, '58,46,32', .3, 1.4);
+    });
+    const deg = pts.map(()=>0); ed.forEach(([u,v])=>{ deg[u]++; deg[v]++; });
+    const pop = ease(seg(t, 35.4, 37));
+    pts.forEach((p,i)=>{
+      const hub = deg[i] >= 6;
+      const r0 = 4 + deg[i]*.9;
+      c.fillStyle = hub ? `rgba(${lerp(58,201,pop)|0},${lerp(46,169,pop)|0},${lerp(32,106,pop)|0},.95)` : 'rgba(58,46,32,.75)';
+      c.beginPath(); c.arc(p[0], p[1] + Math.sin(t*1.3+i)*1.5, hub ? r0*(1+.35*pop) : r0, 0, Math.PI*2); c.fill();
+    });
+    c.restore();
+  }
+}
+
+/* ③ 规则卡 */
+function sceneRules(t){
+  const a = vis(t, 39, 45.2, .7, .7); if (a <= 0) return;
+  const kin = easeOut(seg(t, 39, 40));
+  c.save(); c.globalAlpha = a;
+  c.translate(960, 440 + 50*(1-kin)); c.rotate(-.012);
+  paper(c, 1000, 450);
+  T(c, '实验规则', 0, -168, `900 40px ${SERIF}`, BROWN);
+  T(c, 'The rules of the experiment', 0, -124, `italic 400 24px ${GAR}`, 'rgba(58,46,32,.65)');
+  const rows = [
+    ['① 每个点，是一个人', 'Each dot is a person.'],
+    ['② 连线，代表他们是朋友', 'A line means they are friends.'],
+    ['③ 徽章数字 = 他有几个朋友', 'The badge counts their friends.'],
+  ];
+  rows.forEach((row,i)=>{
+    const k = ease(seg(t, 39.8+i*1.1, 40.5+i*1.1)); if (k <= 0) return;
+    const y = -48 + i*92, x0 = -330;
+    c.save(); c.globalAlpha *= k; c.translate(12*(1-k), 0);
+    // 金色线框图标
+    c.strokeStyle = '#A8843F'; c.lineWidth = 2.5; c.beginPath();
+    if (i === 0){ c.arc(x0-50, y+8, 16, 0, Math.PI*2); }
+    else if (i === 1){ c.arc(x0-74, y+8, 9, 0, Math.PI*2); c.moveTo(x0-17, y+8); c.arc(x0-26, y+8, 9, 0, Math.PI*2); c.moveTo(x0-65, y+8); c.lineTo(x0-35, y+8); }
+    else { roundRect(c, x0-76, y-6, 52, 28, 14); }
+    c.stroke();
+    if (i === 2) T(c, '3', x0-50, y+9, `700 18px ${SANS}`, '#A8843F');
+    T(c, row[0], x0, y-4, `700 34px ${SANS}`, BROWN, 'left');
+    T(c, row[1], x0+4, y+34, `italic 400 22px ${GAR}`, 'rgba(58,46,32,.6)', 'left');
+    c.restore();
+  });
+  c.restore();
+}
+
+/* ④ 8 人网络：比较 → 放大达人 → 被数次数 */
+const CMP0 = 49.2, CMPD = .82;
+function sceneNet(t){
+  const a = vis(t, 45, 75.3, .4, .8); if (a <= 0) return;
+  const z1 = ease(seg(t, 56, 57.4)) - ease(seg(t, 59.6, 61.2));
+  const mv = ease(seg(t, 63, 64.6));
+  const s = (1 + .28*z1) * lerp(1, .82, mv), ox = -380*mv;
+  let hi = -1;
+  for (let i=0;i<8;i++) if (t >= CMP0+i*CMPD && t < CMP0+(i+1)*CMPD) hi = i;
+  const dimO = i => i === 7 ? 1 : 1 - .62*z1;
+  const order = [7,0,1,2,3,4,5,6];
+
+  c.save(); c.globalAlpha = a;
+  c.translate(960+ox, 400); c.scale(s, s); c.translate(-960, -400);
+  G8.edges.forEach(([u,v],j)=>{
+    const p = gpos(u,t), q = gpos(v,t);
+    const prog = ease(seg(t, 45.6+j*.12, 46.2+j*.12));
+    let col = '234,234,242', ea = .45, w = 2.2;
+    if (hi >= 0 && (u === hi || v === hi)){ col = '201,169,106'; ea = .95; w = 3.5; }
+    if (u === 7 || v === 7){ ea = lerp(ea, .95, z1); if (z1 > .3) col = '201,169,106'; }
+    else ea *= 1 - .62*z1;
+    drawEdge(c, p, q, prog, col, ea, w);
+  });
+  // 被数次数：达人的连线上金色小点流向朋友；其他连线上灰点
+  const tok = (u, v, j, col, a0, a1, r0) => {
+    const k = vis(t, a0, a1, .4, .4); if (k <= 0) return;
+    const ph = ((t - a0)*.9 + j*.17) % 1, p = gpos(u,t), q = gpos(v,t);
+    c.fillStyle = `rgba(${col},${.95*k})`;
+    c.beginPath(); c.arc(lerp(p[0],q[0],ph), lerp(p[1],q[1],ph), r0, 0, Math.PI*2); c.fill();
+  };
+  G8.edges.forEach(([u,v],j)=>{
+    if (u === 7) tok(7, v, j, '201,169,106', 63.4, 71.5, 6);
+    else { tok(u, v, j, '234,234,242', 67, 71.5, 4.5); tok(v, u, j+.5, '234,234,242', 67, 71.5, 4.5); }
+  });
+  for (const i of order){
+    const oi = order.indexOf(i);
+    const k = easeOut(seg(t, 45+oi*.18, 45.5+oi*.18)); if (k <= 0) continue;
+    const [x,y] = gpos(i,t), r = (i === 7 ? 44 : 34) * lerp(.6, 1, k);
+    const isHi = hi === i;
+    const glow = isHi ? 1 : (i === 7 ? z1 + .8*vis(t, 63.2, 71.5, .5, .5) : 0);
+    const gc = (i === 7 && z1 > .1 && t < 62) ? '216,88,74' : '201,169,106';
+    const stroke = isHi ? GOLD : i === 6 ? 'rgba(234,234,242,.95)' : 'rgba(234,234,242,.8)';
+    drawNode(c, x, y, r, G8.names[i], {a: k*dimO(i), glow, gc, stroke,
+      font: i === 7 ? `700 25px ${SANS}` : undefined, fill: i === 6 ? '#1E1E40' : undefined});
+    const bk = ease(seg(t, 46.8+oi*.06, 47.4+oi*.06)) * (1 - .0*mv);
+    drawBadge(c, x + r*.82, y - r*.95, String(G8.deg[i]), {a: bk*dimO(i)});
+    // 比较标签
+    const lk = ease(seg(t, CMP0+i*CMPD+.3, CMP0+i*CMPD+.7)) * (1 - ease(seg(t, 62.2, 63)));
+    if (lk > 0){
+      // 上方两人标签放外侧，其余放脚下，避开徽章、连线和顶标签
+      const lx = i === 1 ? x - r - 96 : i === 2 ? x + r + 84 : x, ly = (i === 1 || i === 2) ? y : y + r + 28;
+      const kind = G8.kind[i];
+      const la = lk * (i === 7 ? 1 : 1 - z1);
+      T(c, `朋友均值 ${fmt(G8.favg[i])}`, lx-12, ly, `500 22px ${SANS}`, kind === 'ok' ? INK : DIM, 'center', la);
+      drawMark(c, lx + 70, ly, kind, la);
+    }
+  }
+  c.restore();
+
+  // 右侧数据面板（比较阶段）
+  const pa = a * vis(t, 46.4, 62.8, .6, .6);
+  if (pa > 0){
+    c.save(); c.globalAlpha = pa;
+    T(c, `8 人 · ${G8.edges.length} 段友谊`, 1600, 235, `700 30px ${SANS}`, INK);
+    T(c, '8 people · 10 friendships', 1600, 274, `italic 400 22px ${GAR}`, DIM);
+    T(c, '人均朋友', 1600, 340, `500 24px ${SANS}`, DIM, 'center', ease(seg(t, 46.8, 47.4)));
+    T(c, fmt(G8.mu), 1600, 398, `900 64px ${SANS}`, INK, 'center', ease(seg(t, 46.8, 47.4)));
+    const ck = ease(seg(t, 49.2, 49.8));
+    let cnt = 0; for (let i=0;i<8;i++) if (t >= CMP0+i*CMPD+.5 && G8.kind[i] === 'ok') cnt++;
+    T(c, '朋友比自己受欢迎', 1600, 480, `500 24px ${SANS}`, DIM, 'center', ck);
+    T(c, `${cnt} / 8`, 1600, 540, `900 64px ${SANS}`, GOLD, 'center', ck);
+    c.restore();
+  }
+  // 右侧柱状图（被数次数）
+  const ba = a * ease(seg(t, 63.3, 64.2));
+  if (ba > 0){
+    c.save(); c.globalAlpha = ba;
+    T(c, '在别人好友名单里出现的次数', 1410, 236, `700 30px ${SANS}`, INK);
+    T(c, "Times listed as someone's friend", 1410, 274, `italic 400 22px ${GAR}`, DIM);
+    const base = 590, unit = 40, bw = 48, gap = 26, x0 = 1410 - (8*bw + 7*gap)/2;
+    c.fillStyle = 'rgba(234,234,242,.25)'; c.fillRect(x0-14, base, 8*bw+7*gap+28, 2);
+    order.forEach((i,j)=>{
+      const g = i === 7 ? ease(seg(t, 63.6, 65.4)) : ease(seg(t, 67+j*.14, 68.2+j*.14));
+      const h = G8.deg[i]*unit*g, x = x0 + j*(bw+gap);
+      c.fillStyle = i === 7 ? GOLD : 'rgba(234,234,242,.38)';
+      if (h > 0){ roundRect(c, x, base-h, bw, h, 4); c.fill(); }
+      T(c, G8.names[i], x+bw/2, base+26, `500 ${i===7?20:22}px ${SANS}`, i === 7 ? GOLD : DIM);
+      if (g > .05) T(c, String(Math.round(G8.deg[i]*g)), x+bw/2, base-h-20, `700 24px ${SANS}`, i === 7 ? GOLD : INK, 'center', g);
+    });
+    const s1 = ease(seg(t, 71.3, 72)), s2 = ease(seg(t, 72.3, 73));
+    T(c, '人均朋友', 1250, 652, `500 22px ${SANS}`, DIM, 'center', s1);
+    T(c, fmt(G8.mu), 1250, 696, `900 44px ${SANS}`, INK, 'center', s1);
+    T(c, '朋友的人均朋友', 1570, 652, `500 22px ${SANS}`, DIM, 'center', s2);
+    T(c, G8.fof.toFixed(1), 1570, 696, `900 44px ${SANS}`, GOLD, 'center', s2);
+    if (s2 > 0) T(c, '>', 1410, 690, `700 40px ${SANS}`, DIM, 'center', s2);
+    c.restore();
+  }
+}
+
+/* ④b 公式卡 */
+function sceneFormula(t){
+  const a = vis(t, 75, 83.3, .8, .7); if (a <= 0) return;
+  const kin = easeOut(seg(t, 75, 76));
+  c.save(); c.globalAlpha = a;
+  c.translate(960, 420 + 50*(1-kin)); c.rotate(-.012);
+  paper(c, 1160, 420);
+  // 公式分段出现
+  const parts = [
+    ['朋友的平均朋友数', `900 44px ${SANS}`, BROWN],
+    ['  =  ', `500 56px ${GAR}`, BROWN],
+    ['μ', `italic 500 64px ${GAR}`, BROWN],
+    ['  +  ', `500 56px ${GAR}`, BROWN],
+    ['σ²', `italic 500 64px ${GAR}`, RED],
+    [' / ', `500 56px ${GAR}`, BROWN],
+    ['μ', `italic 500 64px ${GAR}`, BROWN],
+  ];
+  let total = 0; const ws = parts.map(([s,f])=>{ c.font = f; const w = c.measureText(s).width; total += w; return w; });
+  let x = -total/2;
+  parts.forEach(([s,f,col],i)=>{
+    const k = ease(seg(t, 75.6+i*.32, 76.1+i*.32));
+    T(c, s, x, -92 + 8*(1-k), f, col, 'left', k);
+    x += ws[i];
+  });
+  const lk = ease(seg(t, 77.4, 78.2));
+  T(c, 'μ：平均朋友数', -210, -6, `500 26px ${SANS}`, 'rgba(58,46,32,.8)', 'center', lk);
+  T(c, 'σ²：人和人之间朋友数的差异（方差）', 170, -6, `500 26px ${SANS}`, 'rgba(58,46,32,.8)', 'center', lk);
+  c.fillStyle = `rgba(58,46,32,${.2*lk})`; c.fillRect(-460, 38, 920, 1.5);
+  const nk = ease(seg(t, 79.2, 80));
+  T(c, `${fmt(G8.mu)}  +  ${G8.sigma2.toFixed(2)} ÷ ${fmt(G8.mu)}  =  ${G8.fof.toFixed(1)}`, 0, 96, `600 50px ${GAR}`, '#8C6A2A', 'center', nk);
+  T(c, '只要 σ² > 0，右边就一定比 μ 大', 0, 160, `500 25px ${SANS}`, 'rgba(58,46,32,.75)', 'center', ease(seg(t, 80.8, 81.6)));
+  c.restore();
+}
+
+/* 1000 人网络 */
+function drawBA(c, t, o){
+  const {P, edges, rad, par, n} = BA;
+  const nk = o.nodeK, gk = o.goldK;
+  c.save(); c.globalAlpha *= o.a;
+  if (o.cx !== undefined){ c.translate(o.cx, o.cy); c.scale(o.s, o.s); c.translate(-o.cx, -o.cy); }
+  if (o.edgesFull){
+    c.strokeStyle = 'rgba(234,234,242,.09)'; c.lineWidth = 1; c.beginPath();
+    for (const [u,v] of edges){ c.moveTo(P[u][0],P[u][1]); c.lineTo(P[v][0],P[v][1]); }
+    c.stroke();
+  } else {
+    c.lineWidth = 1;
+    for (const [u,v] of edges){
+      const k = Math.min(nk(u), nk(v)); if (k <= 0) continue;
+      c.strokeStyle = `rgba(234,234,242,${.09*k})`;
+      c.beginPath(); c.moveTo(P[u][0],P[u][1]); c.lineTo(P[v][0],P[v][1]); c.stroke();
+    }
+  }
+  for (let i=0;i<n;i++){
+    const k = nk(i); if (k <= 0) continue;
+    const g = par[i] ? gk(i) : 0;
+    const r = rad[i] * lerp(.3, 1, k) * (1 + .25*g*(.5+.5*Math.sin(t*2.4+i)));
+    c.fillStyle = g > 0
+      ? `rgba(${lerp(154,201,g)|0},${lerp(154,169,g)|0},${lerp(184,106,g)|0},${.9*k})`
+      : `rgba(154,154,184,${.75*k})`;
+    c.beginPath(); c.arc(P[i][0], P[i][1] + Math.sin(t*.9+i)*1.2, r, 0, Math.PI*2); c.fill();
+  }
+  c.restore();
+}
+const BA_PCT = BA.nPar / BA.n * 100;
+function sceneBA(t){
+  const a = vis(t, 83, 91.4, .5, .9); if (a <= 0) return;
+  drawBA(c, t, {a,
+    edgesFull: t > 86,
+    nodeK: i => easeOut(seg(t, 83+2.6*i/BA.n, 83.3+2.6*i/BA.n)),
+    goldK: i => ease(seg(t, 86+3.2*BA.rank[i], 86.4+3.2*BA.rank[i])),
+  });
+  // 计数面板
+  const pk = a * ease(seg(t, 83.6, 84.4));
+  let cnt = 0; for (let i=0;i<BA.n;i++) if (BA.par[i] && t >= 86.2+3.2*BA.rank[i]) cnt++;
+  c.save(); c.globalAlpha = pk;
+  T(c, `${BA.n} 人`, 1690, 250, `700 32px ${SANS}`, INK);
+  T(c, '朋友比自己受欢迎', 1690, 330, `500 22px ${SANS}`, DIM);
+  T(c, `${(cnt/BA.n*100).toFixed(1)}%`, 1690, 390, `900 64px ${SANS}`, GOLD);
+  const sk = ease(seg(t, 89.4, 90));
+  T(c, `人均朋友 ${BA.mu.toFixed(1)}`, 1690, 470, `500 22px ${SANS}`, DIM, 'center', sk);
+  T(c, `朋友的人均朋友 ${BA.fof.toFixed(1)}`, 1690, 506, `600 22px ${SANS}`, GOLD, 'center', sk);
+  c.restore();
+}
+
+/* ⑤ Facebook：7.21 亿 → 粒子收拢成时间轴 */
+const FB = (()=>{
+  const r = mulberry32(2011), N = 1400;
+  return Array.from({length:N}, (_,i)=>{
+    const a = r()*Math.PI*2, d = Math.sqrt(r());
+    return {x: 960+Math.cos(a)*d*860, y: 430+Math.sin(a)*d*280, gold: r() < .88, rank: r(), s: r(), tx: 360 + i/N*1200};
+  });
+})();
+function sceneFB(t){
+  const a = vis(t, 91, 103.6, .6, 1); if (a <= 0) return;
+  const e = ease(seg(t, 91, 93.8)), f = ease(seg(t, 99.6, 102.6));
+  c.save(); c.globalAlpha = a;
+  for (const p of FB){
+    const x0 = lerp(960, p.x, lerp(.04, 1, e)), y0 = lerp(430, p.y, lerp(.04, 1, e));
+    const x = lerp(x0 + Math.sin(t*.6+p.s*20)*4, p.tx, f), y = lerp(y0, 600 + Math.sin(p.s*40)*3*(1-f), f);
+    const g = p.gold ? ease(seg(t, 95.2+p.rank*2.8, 95.6+p.rank*2.8)) : 0;
+    c.fillStyle = g > 0 ? `rgba(201,169,106,${.35+.45*g})` : 'rgba(170,170,200,.45)';
+    c.fillRect(x, y, 2.2, 2.2);
+  }
+  const ck = vis(t, 91.2, 99.4, .5, .6);
+  if (ck > 0){
+    const v = Math.round(721000000 * easeOut(seg(t, 91.2, 93.8)));
+    c.save(); c.shadowColor = 'rgba(5,5,16,.95)'; c.shadowBlur = 30;
+    T(c, v.toLocaleString('en-US'), 960, 400, `900 92px ${SANS}`, INK, 'center', ck);
+    T(c, '2011 年 5 月 · Facebook 活跃用户', 960, 476, `500 28px ${SANS}`, DIM, 'center', ck);
+    T(c, 'Active users, May 2011', 960, 516, `italic 400 24px ${GAR}`, DIM, 'center', ck);
+    c.restore();
+  }
+  c.restore();
+}
+
+/* ⑤b 哈佛流感：两组人 → 流行曲线 */
+function sceneFlu(t){
+  const a = vis(t, 102.6, 115.4, .6, .7); if (a <= 0) return;
+  c.save(); c.globalAlpha = a;
+  // 横轴（承接粒子收拢的那条线）
+  c.fillStyle = 'rgba(234,234,242,.6)'; c.fillRect(360, 600, 1200, 2);
+  // 两组人
+  const ga = vis(t, 103, 107.4, .6, .7);
+  if (ga > 0){
+    const r = mulberry32(2009);
+    const grp = (cx, n, col, k) => { for (let i=0;i<n;i++){ const an = r()*Math.PI*2, d = Math.sqrt(r())*105;
+      const kk = clamp(k*n - i*.5, 0, 1); if (kk <= 0) continue;
+      c.fillStyle = `rgba(${col},${.85*kk})`; c.beginPath();
+      c.arc(cx + Math.cos(an)*d, 400 + Math.sin(an)*d*.8 + Math.sin(t+i)*1.5, 5, 0, Math.PI*2); c.fill(); } };
+    c.save(); c.globalAlpha *= ga;
+    T(c, '随机抽取的学生', 700, 262, `700 30px ${SANS}`, INK);
+    T(c, 'Randomly chosen students', 700, 298, `italic 400 22px ${GAR}`, DIM);
+    grp(700, 64, '170,170,200', seg(t, 103.2, 104.4));
+    T(c, '319 人', 700, 540, `900 36px ${SANS}`, INK);
+    const fk = ease(seg(t, 104.8, 105.6));
+    T(c, '他们点名的朋友', 1220, 262, `700 30px ${SANS}`, GOLD, 'center', fk);
+    T(c, 'The friends they named', 1220, 298, `italic 400 22px ${GAR}`, DIM, 'center', fk);
+    grp(1220, 85, '201,169,106', seg(t, 104.8, 106));
+    T(c, '425 人', 1220, 540, `900 36px ${SANS}`, GOLD, 'center', fk);
+    const ar = ease(seg(t, 104.2, 105.2));
+    if (ar > 0){
+      c.strokeStyle = 'rgba(234,234,242,.6)'; c.lineWidth = 2.5; c.beginPath();
+      c.moveTo(850, 400); c.lineTo(lerp(850, 1060, ar), 400); c.stroke();
+      if (ar > .95){ c.beginPath(); c.moveTo(1048, 390); c.lineTo(1062, 400); c.lineTo(1048, 410); c.stroke(); }
+      T(c, '点名', 955, 376, `500 22px ${SANS}`, DIM, 'center', ar);
+    }
+    c.restore();
+  }
+  // 流行曲线（示意）
+  const ca = ease(seg(t, 106.8, 107.6));
+  if (ca > 0){
+    c.save(); c.globalAlpha *= ca;
+    c.fillStyle = 'rgba(234,234,242,.6)'; c.fillRect(360, 270, 2, 330);
+    T(c, '累计确诊（示意）', 372, 252, `500 22px ${SANS}`, DIM, 'left');
+    T(c, '9 月', 360, 632, `500 22px ${SANS}`, DIM);
+    T(c, '12 月', 1560, 632, `500 22px ${SANS}`, DIM);
+    T(c, '2009 年秋季学期 · Fall 2009', 960, 632, `italic 400 22px ${GAR}`, DIM);
+    const xm = lerp(360, 1560, ease(seg(t, 107.2, 110.4)));
+    const curve = (x0, col, w) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath();
+      for (let x=360; x<=xm; x+=4){ const y = 600 - 300/(1+Math.exp(-(x-x0)/45)); x === 360 ? c.moveTo(x,y) : c.lineTo(x,y); }
+      c.stroke(); };
+    const glow = .5 + .5*Math.sin(t*3);
+    curve(1100, 'rgba(170,170,200,.85)', 3);
+    c.save(); c.shadowColor = 'rgba(201,169,106,.8)'; c.shadowBlur = 10 + 14*glow*seg(t, 111, 112);
+    curve(962, GOLD, 4); c.restore();
+    const lk = ease(seg(t, 109.4, 110.2));
+    if (lk > 0){
+      c.save(); c.globalAlpha *= lk; c.strokeStyle = INK; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(972, 450); c.lineTo(1090, 450);
+      c.moveTo(982, 442); c.lineTo(972, 450); c.lineTo(982, 458);
+      c.moveTo(1080, 442); c.lineTo(1090, 450); c.lineTo(1080, 458); c.stroke();
+      c.restore();
+      T(c, '约早两周', 1112, 436, `700 28px ${SANS}`, GOLD, 'left', lk);
+      T(c, '~2 weeks earlier', 1114, 472, `italic 400 22px ${GAR}`, DIM, 'left', lk);
+      T(c, '被点名的朋友', 925, 330, `700 24px ${SANS}`, GOLD, 'right', lk);
+      T(c, '随机学生', 1160, 548, `700 24px ${SANS}`, 'rgba(170,170,200,.95)', 'left', lk);
+    }
+    c.restore();
+  }
+  c.restore();
+}
+
+/* ⑤c 熟人免疫：随机挑人 → 沿连线找到他的朋友 */
+function sceneAcq(t){
+  const a = vis(t, 115, 119.4, .6, .7); if (a <= 0) return;
+  c.save(); c.globalAlpha = a;
+  c.translate(960, 420); c.scale(.92, .92); c.translate(-960, -400);
+  const step2 = ease(seg(t, 116.5, 117.5)), step3 = ease(seg(t, 117.4, 118));
+  G8.edges.forEach(([u,v])=>{
+    const hot = (u === 7 && v === 4);
+    drawEdge(c, gpos(u,t), gpos(v,t), 1, hot && step2 > 0 ? '201,169,106' : '234,234,242', hot ? lerp(.45,.95,step2) : .4, hot ? 3.5 : 2.2);
+  });
+  if (step2 > 0 && step2 < 1){
+    const p = gpos(4,t), q = gpos(7,t);
+    c.fillStyle = GOLD; c.beginPath(); c.arc(lerp(p[0],q[0],step2), lerp(p[1],q[1],step2), 8, 0, Math.PI*2); c.fill();
+  }
+  for (let i=0;i<8;i++){
+    const [x,y] = gpos(i,t), r = i === 7 ? 44*(1+.15*step3) : 34;
+    const pick = ease(seg(t, 115.4, 116.2));
+    const ring = i === 4 ? pick : 0;
+    drawNode(c, x, y, r, G8.names[i], {glow: i === 7 ? step3 : ring*.8, stroke: i === 4 && pick > .5 ? INK : i === 7 && step3 > .3 ? GOLD : 'rgba(234,234,242,.7)',
+      font: i === 7 ? `700 25px ${SANS}` : undefined, fill: i === 6 ? '#1E1E40' : undefined});
+    drawBadge(c, x + r*.82, y - r*.95, String(G8.deg[i]), {a: .9});
+    if (i === 4 && ring > 0){
+      c.save(); c.globalAlpha *= ring; c.strokeStyle = INK; c.setLineDash([6,6]); c.lineWidth = 2;
+      c.beginPath(); c.arc(x, y, r+14 + 3*Math.sin(t*4), 0, Math.PI*2); c.stroke(); c.restore();
+      T(c, '随机挑一个人', x-70, y, `700 26px ${SANS}`, INK, 'right', ring);
+    }
+  }
+  T(c, '他的朋友，往往就是枢纽', 960, 482, `700 26px ${SANS}`, GOLD, 'center', step3);
+  c.restore();
+}
+
+/* ⑥ 落点：回到"你"，拉远成千人网络 */
+function sceneOutro(t){
+  const a = vis(t, 119, 131.3, .7, .9); if (a <= 0) return;
+  const z = ease(seg(t, 123, 126.4));
+  if (z < 1){
+    const s = lerp(1, .2, z);
+    c.save(); c.globalAlpha = a * (1 - ease(seg(t, 125.4, 126.6)));
+    c.translate(960, 420); c.scale(s, s); c.translate(-960, -420);
+    drawHook(c, 9, t);
+    c.restore();
+  }
+  if (z > 0){
+    drawBA(c, t, {a: a*z, edgesFull: true, cx: 960, cy: 430, s: lerp(2.4, 1, z),
+      nodeK: () => 1, goldK: () => 1});
+    // 气泡：每个普通人都觉得"朋友比我多"
+    BA.bubbles.forEach((i,j)=>{
+      const k = ease(seg(t, 127+j*.1, 127.5+j*.1)) * a; if (k <= 0) return;
+      const [x,y] = BA.P[i], bx = x + 10, by = y - 26 + Math.sin(t*2+j)*2;
+      c.save(); c.globalAlpha = k;
+      c.fillStyle = 'rgba(234,234,242,.92)'; roundRect(c, bx-4, by-14, 36, 24, 10); c.fill();
+      c.beginPath(); c.moveTo(bx+2, by+8); c.lineTo(bx-4, by+16); c.lineTo(bx+10, by+9); c.fill();
+      c.fillStyle = '#14142E'; c.beginPath();
+      for (let d=0; d<3; d++) c.arc(bx+5+d*9, by-2, 2.2, 0, Math.PI*2);
+      c.fill(); c.restore();
+    });
+  }
+}
+
+/* ⑦ 收尾：声明 → 出品 + 引用 */
+function sceneEnd(t){
+  const a1 = vis(t, 131.2, 135.2, .7, .6);
+  if (a1 > 0){
+    T(c, '声明', 960, 330, `900 40px ${SERIF}`, GOLD, 'center', a1, 8);
+    T(c, '本片网络图为示意模型，不代表任何真实社交关系。', 960, 410, `500 32px ${SANS}`, INK, 'center', a1);
+    T(c, 'The networks shown are illustrative models, not real social data.', 960, 458, `italic 400 26px ${GAR}`, DIM, 'center', a1);
+    T(c, '觉得朋友比你多？绝大多数人都这么觉得。', 960, 540, `500 28px ${SANS}`, DIM, 'center', a1 * ease(seg(t, 132.2, 133)));
+  }
+  const a2 = ease(seg(t, 135.2, 136));
+  if (a2 > 0){
+    T(c, '@Leo 出品', 960, 268, `900 60px ${SERIF}`, GOLD, 'center', a2, 4);
+    T(c, '参考 · References', 960, 360, `500 22px ${SANS}`, DIM, 'center', a2, 4);
+    const refs = [
+      'S. L. Feld, "Why Your Friends Have More Friends Than You Do," American Journal of Sociology 96(6), 1991',
+      'N. A. Christakis & J. H. Fowler, "Social Network Sensors for Early Detection of Contagious Outbreaks," PLoS ONE, 2010',
+      'J. Ugander, B. Karrer, L. Backstrom & C. Marlow, "The Anatomy of the Facebook Social Graph," arXiv:1111.4503, 2011',
+      'R. Cohen, S. Havlin & D. ben-Avraham, "Efficient Immunization Strategies…," Phys. Rev. Lett. 91, 247901, 2003',
+    ];
+    refs.forEach((s,i)=> T(c, s, 960, 412 + i*44, `italic 400 25px ${GAR}`, 'rgba(234,234,242,.78)', 'center', ease(seg(t, 135.6+i*.25, 136.2+i*.25))));
+    // 角落：一个缓慢呼吸的小点"你"
+    const pk = ease(seg(t, 136.6, 137.4));
+    drawNode(c, 960, 660, 16 + Math.sin(t*2)*1.5, '', {a: pk, glow: .8 + .2*Math.sin(t*2)});
+  }
+}
+
+function drawScene(t){
+  c.clearRect(0,0,1920,1080);
+  sceneHook(t); sceneDocs(t); sceneRules(t); sceneNet(t); sceneFormula(t);
+  sceneBA(t); sceneFB(t); sceneFlu(t); sceneAcq(t); sceneOutro(t); sceneEnd(t);
+}
+
+/* ================= 覆盖层 ================= */
+const $ = id => document.getElementById(id);
+function drawOverlay(t){
+  const inTitle = t >= TITLE_CARD[0] && t < TITLE_CARD[1];
+  const sub = SUBTITLES.find(([a,b]) => t >= a && t < b);
+  const el = $('subtitle'), elEn = $('subtitle-en');
+  if (sub && !inTitle) {
+    const [a, b, zh, en] = sub;
+    const kIn  = ease(clamp((t-a)/0.45, 0, 1));
+    const kOut = 1 - ease(clamp((t-(b-0.4))/0.4, 0, 1));
+    el.style.opacity = kIn * kOut;
+    el.style.transform = `translateY(${lerp(8,0,kIn)}px)`;
+    if (el.innerHTML !== zh) el.innerHTML = zh;
+    elEn.textContent = en || '';
+    elEn.style.opacity = kIn * kOut * .9;
+  } else { el.innerHTML = ''; elEn.textContent = ''; }
+  const tc = $('titlecard');
+  if (inTitle) {
+    tc.style.display = 'flex';
+    const k = ease(clamp((t-TITLE_CARD[0])/1.2, 0, 1)) * (1 - ease(seg(t, TITLE_CARD[1]-.7, TITLE_CARD[1])));
+    tc.style.opacity = k;
+    tc.querySelector('.name').textContent = TITLE_CARD[2];
+    tc.querySelector('.q').textContent = TITLE_CARD[3];
+    tc.querySelector('.q-en').textContent = TITLE_CARD[4];
+    tc.querySelector('.name').style.transform = `scale(${lerp(.94, 1, easeOut(seg(t, TITLE_CARD[0], TITLE_CARD[1])))})`;
+  } else tc.style.display = 'none';
+  let sec = SECTIONS[0];
+  for (const s of SECTIONS) if (t >= s[0]) sec = s;
+  $('toplabel').textContent = sec[1] ? `${CFG.topic}　${sec[1]}` : CFG.topic;
+  $('annotation').textContent = sec[2] || '';
+}
+
+/* ================= 帧入口 ================= */
+window.render = function(t){ drawBG(t); drawScene(t); drawOverlay(t); };
+/* 渲染管线的异步初始化：把脚本里出现的所有字形都预加载，防止中途换字体 */
+window.setup = function(done){
+  const text = document.querySelector('script').textContent + document.body.innerText;
+  const faces = [`400 20px "Noto Sans SC"`, `500 20px "Noto Sans SC"`, `600 20px "Noto Sans SC"`, `700 20px "Noto Sans SC"`, `900 20px "Noto Sans SC"`,
+    `600 20px "Noto Serif SC"`, `900 20px "Noto Serif SC"`,
+    `400 20px "EB Garamond"`, `500 20px "EB Garamond"`, `600 20px "EB Garamond"`, `italic 400 20px "EB Garamond"`, `italic 500 20px "EB Garamond"`];
+  Promise.all(faces.map(f => document.fonts.load(f, text).catch(()=>null)))
+    .then(() => document.fonts.ready).then(() => done && done());
+};
+window.STATS = { g8: {mu: G8.mu, fof: G8.fof, nPar: G8.nPar}, ba: {pct: BA_PCT, mu: BA.mu, fof: BA.fof, maxDeg: Math.max(...BA.deg)} };
+let t0 = performance.now();
+(function loop(){
+  if (window.__RENDER_MODE__) return;
+  window.render(((performance.now()-t0)/1000) % CFG.duration);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
