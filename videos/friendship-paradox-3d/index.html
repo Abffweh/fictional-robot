@@ -52,12 +52,22 @@
   .lab { margin-top: -30px; }
   #title .refs { font: italic 500 30px 'EB Garamond', serif; color: rgba(243,232,207,.85); text-align: center; line-height: 1.7; margin-top: 18px; }
   #title .note { font: 500 26px 'Noto Serif SC'; color: rgba(243,232,207,.6); margin-top: 18px; }
+  #hook { position: absolute; left: 0; right: 0; z-index: 25; text-align: center; font-family: 'Noto Serif SC', serif; color: #F6ECD6; pointer-events: none;
+           text-shadow: 0 3px 14px rgba(15,8,3,.95), 0 0 3px rgba(15,8,3,.95); }
+  #hook .t { display: inline-block; font-weight: 900; letter-spacing: 4px; }
+  #hook .hc { display: inline-block; }
+  #hook .g { color: #F0C987; } #hook .r { color: #EE7A62; }
+  #hook .u { height: 5px; margin: 10px auto 0; background: linear-gradient(90deg, rgba(240,201,135,0), #F0C987 20%, #F0C987 80%, rgba(240,201,135,0)); }
+  #hookbg { position: absolute; left: 0; right: 0; top: 0; height: 240px; z-index: 24; pointer-events: none;
+           background: linear-gradient(180deg, rgba(20,11,5,.62), rgba(20,11,5,0)); }
 </style>
 </head>
 <body>
 <div id="stage">
   <canvas id="gl" width="1920" height="1080"></canvas>
   <div id="labels"></div>
+  <div id="hookbg"></div>
+  <div id="hook"><div class="t"><span class="hc ">你</span><span class="hc ">的</span><span class="hc ">朋</span><span class="hc ">友</span><span class="hc ">比</span><span class="hc ">你</span><span class="hc g">更</span><span class="hc g">受</span><span class="hc g">欢</span><span class="hc g">迎</span><span class="hc r">？</span></div><div class="u"></div></div>
   <div id="check" class="ui"></div>
   <div id="corner" class="ui"><div class="a"></div><div class="b"></div></div>
   <div id="subtitle" class="ui"></div>
@@ -797,11 +807,11 @@ function labels(t, sh){
     if (t >= 46.6){ L.push(['th1', V3(137.4, 5.9, -1.5), '人均 2.5', seg(t, 47.6, 48.0), 'small']); L.push(['th2', V3(139.0, 5.9, -1.5), '朋友的人均 3.2', seg(t, 48.5, 48.9), 'small gold']); }
   }
   if (sh.sets[0] === 'campus'){
-    L.push(['g1', V3(294.8, 2.7, 1.6), '随机学生 319', t < 76 ? seg(t, 70.6, 71.0) : 0, 'small']);
+    L.push(['g1', V3(297.6, 2.7, 1.6), '随机学生 319', t < 76 ? seg(t, 70.6, 71.0) : 0, 'small']);
     L.push(['g2', V3(305.2, 2.7, 1.6), '被点名的朋友 425', t < 76 ? seg(t, 73.5, 73.9) : 0, 'small gold']);
     if (t >= 76 && t < 79.4){ L.push(['th1', V3(299.0, 6.6, -3.2), '随机', seg(t, 76.2, 76.6), 'small']); L.push(['th2', V3(301.0, 6.6, -3.2), '朋友', seg(t, 76.2, 76.6), 'small gold']);
       L.push(['early', V3(303.6, 4.6, -3.2), '早约两周', seg(t, 77.6, 78.0), 'gold']); }
-    if (t >= 79.4){ L.push(['pick', wp(SETS.campus.pick, 1.9), '随机挑一人', seg(t, 79.6, 80.0), 'small']); L.push(['hub2', wp(SETS.campus.hub, 2.1), 'TA的朋友：枢纽', seg(t, 80.9, 81.3), 'small gold']); }
+    if (t >= 79.4){ L.push(['hub2', wp(SETS.campus.hub, 2.1), '随机一人的朋友：枢纽', seg(t, 80.9, 81.3), 'small gold']); }
   }
   const used = new Set();
   for (const [id, pos, text, a, cls] of L){ label(id, pos, text, a, cls); used.add(id); }
@@ -811,6 +821,32 @@ function labels(t, sh){
 /* ================= 帧入口 ================= */
 function shotAt(t){ for (const s of SHOTS) if (t >= s.t0 && t < s.t1) return s; return SHOTS[SHOTS.length-1]; }
 const SET_T0 = {chat: 3.4};
+/* 顶部钩子标题：第 0 帧即完整可见；开场大字，正片缩小常驻 */
+function hookUI(t){
+  const el = $('hook'), t1 = el.querySelector('.t'), u = el.querySelector('.u'), bg = $('hookbg');
+  const big = t < 13.1, hide = (t >= 13.1 && t < 16.6) || t >= 88.8;
+  if (hide){ el.style.opacity = 0; bg.style.opacity = 0; return; }
+  // 逐字从模糊到清晰（开场 0.05s 起；正片常驻条 16.6s 起）
+  const st = big ? .05 : 16.6;
+  el.querySelectorAll('.hc').forEach((c, i) => {
+    const k = easeOut(seg(t, st + i*.06, st + i*.06 + .5));
+    c.style.opacity = k; c.style.filter = `blur(${(1-k)*16}px)`; c.style.transform = `scale(${lerp(1.25, 1, k)})`;
+  });
+  if (big){
+    const out = ease(seg(t, 12.6, 13.1));
+    el.style.top = '56px'; t1.style.fontSize = '84px';
+    const beat = 1 + .025*Math.max(0, Math.sin(t*Math.PI/1.6))**8;     // 每 3.2 秒轻轻"跳"一下
+    t1.style.transform = `scale(${beat})`;
+    const ut = t < 6.5 ? t - .9 : t % 6.5; u.style.width = (560*easeOut(seg(ut, 0, 1.0))) + 'px'; u.style.opacity = (ut < 0 ? 0 : 1) * (1 - seg(ut, 5.6, 6.5));
+    el.style.opacity = 1 - out; bg.style.opacity = (1 - out) * ease(seg(t, 0, .4));
+  } else {
+    const k = ease(seg(t, 16.6, 17.2)) * (1 - ease(seg(t, 88.3, 88.8)));
+    el.style.top = '34px'; t1.style.fontSize = '46px'; t1.style.transform = 'none';
+    u.style.width = '0px'; u.style.opacity = 0;
+    el.style.opacity = .92*k; bg.style.opacity = .55*k;
+  }
+}
+const OVERLAY_ONLY = /overlay/.test(location.search);   // ?overlay：只渲染顶部标题层（透明背景），用于给已渲好的成片叠字
 window.render = function(t){
   const sh = shotAt(t), raw = seg(t, sh.t0, sh.t1), k = sh.out ? easeOut(raw) : ease(raw);
   camera.position.lerpVectors(sh.p[0], sh.p[1], k);
@@ -832,6 +868,7 @@ window.render = function(t){
   post(sh.focus ?? .5, sh.band ?? (sh.wide ? .1 : .14), sh.blur ?? (sh.wide ? 9 : 7), t, sh.fade ?? 1);
   labels(t, sh);
   overlay(t);
+  hookUI(t);
 };
 window.setup = function(done){
   const text = document.documentElement.innerHTML + SUBS.map(s=>s[2]).join('');
@@ -841,6 +878,11 @@ window.setup = function(done){
 };
 window.DURATION = DURATION;
 window.STATS = {g8: {mu: G8.mu, fof: G8.fof, nPar: G8.nPar}, ba: {pct: BA_PCT}};
+if (OVERLAY_ONLY){
+  document.body.style.background = 'transparent'; document.documentElement.style.background = 'transparent';
+  for (const id of ['gl','labels','check','corner','subtitle','watermark','title']) $(id).style.display = 'none';
+  window.render = function(t){ hookUI(t); };
+}
 let t0 = performance.now();
 (function loop(){ if (window.__RENDER_MODE__) return; window.render(((performance.now()-t0)/1000) % DURATION); requestAnimationFrame(loop); })();
 </script>
