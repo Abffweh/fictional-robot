@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自适应图标前景：S 形小蛇 + 红苹果，全部位于 66dp 安全区内。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 蛇身 -->
+    <path
+        android:pathData="M38,34 L62,34 A10,10 0 0 1 62,54 L46,54 A10,10 0 0 0 46,74 L64,74"
+        android:strokeWidth="9"
+        android:strokeColor="#FFB8F27C"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <!-- 蛇头 -->
+    <path
+        android:fillColor="#FFB8F27C"
+        android:pathData="M58.5,74 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0 z" />
+    <!-- 眼睛 -->
+    <path
+        android:fillColor="#FF14301F"
+        android:pathData="M66,71 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0 z" />
+    <!-- 苹果 -->
+    <path
+        android:fillColor="#FFFF5A4E"
+        android:pathData="M69,37 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0 z" />
+    <path
+        android:fillColor="#FFB8F27C"
+        android:pathData="M74.5,31.5 q3,-4 6,-3 q-1.5,3.5 -6,3 z" />
+</vector>

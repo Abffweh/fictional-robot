@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>贪吃蛇</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="hud">
+      <div class="hud-item"><span class="hud-label">得分</span><span id="hud-score" class="hud-value">0</span></div>
+      <div class="hud-item"><span class="hud-label">最高</span><span id="hud-best" class="hud-value">0</span></div>
+      <div class="hud-spacer"></div>
+      <button id="btn-pause" class="icon-btn" type="button" aria-label="暂停">❚❚</button>
+    </header>
+
+    <main id="stage">
+      <canvas id="board" aria-label="游戏画面"></canvas>
+    </main>
+
+    <section id="screen-menu" class="overlay" data-screen="menu">
+      <div class="panel">
+        <h1 class="title">贪吃蛇</h1>
+        <label class="row"><span>穿墙</span><input id="opt-wrap" type="checkbox"></label>
+        <button id="btn-start" class="btn primary" type="button">开始游戏</button>
+        <p class="hint">方向键 / WASD / 滑动屏幕 控制，空格暂停</p>
+      </div>
+    </section>
+
+    <section id="screen-pause" class="overlay hidden" data-screen="pause">
+      <div class="panel">
+        <h2>已暂停</h2>
+        <button id="btn-resume" class="btn primary" type="button">继续</button>
+        <button id="btn-pause-menu" class="btn" type="button">返回菜单</button>
+      </div>
+    </section>
+
+    <section id="screen-over" class="overlay hidden" data-screen="over">
+      <div class="panel">
+        <h2>游戏结束</h2>
+        <p class="big">得分 <b id="over-score">0</b></p>
+        <p>最高分 <b id="over-best">0</b></p>
+        <button id="btn-retry" class="btn primary" type="button">再来一局</button>
+        <button id="btn-over-menu" class="btn" type="button">返回菜单</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/core.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

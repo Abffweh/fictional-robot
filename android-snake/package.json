@@ -1,0 +1,14 @@
+{
+  "name": "android-snake",
+  "version": "1.0.0",
+  "private": true,
+  "description": "贪吃蛇（荣耀平板）—— 游戏逻辑单元测试与端到端测试",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --test --test-reporter=spec \"tests/unit/*.test.js\"",
+    "test:e2e": "node --test --test-concurrency=1 --test-reporter=spec \"tests/e2e/*.test.js\""
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

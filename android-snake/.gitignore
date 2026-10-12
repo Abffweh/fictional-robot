@@ -1,0 +1,17 @@
+# Gradle / Android
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+captures/
+.cxx/
+# 构建产物（由 GitHub Actions 生成并作为 artifact 上传）
+dist/
+*.apk
+*.aab
+# Node
+node_modules/
+# 端到端测试截图
+test-results/

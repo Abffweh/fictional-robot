@@ -1,0 +1,91 @@
+:root {
+  --bg: #eff4ea;
+  --panel: #ffffffee;
+  --text: #1d2a22;
+  --muted: #5d6f63;
+  --accent: #2f9e5b;
+  --board-a: #dfeccf;
+  --board-b: #d6e6c4;
+  --snake: #2f9e5b;
+  --snake-light: #8fdc6a;
+  --food: #e5483c;
+  --wall: #6b5a4a;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "HarmonyOS Sans SC", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+}
+
+#hud {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 16px;
+  min-height: 56px;
+}
+.hud-item { display: flex; align-items: baseline; gap: 6px; }
+.hud-label { color: var(--muted); font-size: 14px; }
+.hud-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hud-spacer { flex: 1; }
+
+#stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+}
+#board { position: absolute; display: block; }
+
+.icon-btn {
+  min-width: 44px; height: 44px;
+  border: 0; border-radius: 12px;
+  background: var(--panel); color: var(--text);
+  font-size: 16px; font-weight: 700;
+}
+
+.overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .28);
+  z-index: 10;
+}
+.overlay.hidden { display: none; }
+
+.panel {
+  width: min(420px, calc(100vw - 32px));
+  background: var(--panel);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex; flex-direction: column; gap: 12px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .18);
+}
+.title { margin: 0 0 8px; font-size: 40px; color: var(--accent); }
+.row { display: flex; justify-content: space-between; align-items: center; font-size: 18px; padding: 4px 0; }
+.btn {
+  height: 52px; border-radius: 14px; border: 0;
+  font-size: 18px; font-weight: 600;
+  background: rgba(0, 0, 0, .06); color: var(--text);
+}
+.btn.primary { background: var(--accent); color: #fff; }
+.hint { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+.big { font-size: 22px; margin: 4px 0; }
+h2 { margin: 0 0 4px; }
