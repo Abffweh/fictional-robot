@@ -24,6 +24,8 @@
     <div id="play">
       <main id="stage">
         <canvas id="board" aria-label="游戏画面"></canvas>
+        <div id="demo-badge" aria-hidden="true">AI 演示中 · 点击画面暂停</div>
+        <div id="toast" class="toast hidden" role="status"></div>
       </main>
       <div id="dpad" aria-label="方向键">
         <button class="dpad-btn up" type="button" data-dir="up" aria-label="上">▲</button>
@@ -154,6 +156,8 @@
   <script src="js/core.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/render.js"></script>
   <script src="js/game.js"></script>
 </body>

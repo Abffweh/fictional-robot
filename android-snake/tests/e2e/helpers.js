@@ -51,19 +51,66 @@ function isOpposite(a, b) {
   return VEC[a][0] === -VEC[b][0] && VEC[a][1] === -VEC[b][1];
 }
 
-/** 朝食物走的下一步方向（简单贪心，开局蛇很短，足够安全）。 */
+/**
+ * 测试用的“玩家”：BFS 找一条避开蛇身和障碍的最短路去食物，返回第一步方向；
+ * 找不到路时选一个安全且空间最大的方向。只用于驱动测试，不是游戏里的 AI。
+ */
 function planTowards(s, target) {
-  const head = s.snake[0];
+  const { cols, rows } = s;
+  const n = cols * rows;
+  const wrap = !!s.wrap;
+  const blocked = new Uint8Array(n);
+  // 尾巴下一步会移走，所以不算障碍
+  for (let i = 0; i < s.snake.length - 1; i++) blocked[s.snake[i].y * cols + s.snake[i].x] = 1;
+  const step = (x, y, d) => {
+    let nx = x + VEC[d][0];
+    let ny = y + VEC[d][1];
+    if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) {
+      if (!wrap) return -1;
+      nx = (nx + cols) % cols;
+      ny = (ny + rows) % rows;
+    }
+    const i = ny * cols + nx;
+    return blocked[i] ? -1 : i;
+  };
   const cur = dirName(s.dir);
-  const wants = [];
-  if (target.x > head.x) wants.push('right');
-  if (target.x < head.x) wants.push('left');
-  if (target.y > head.y) wants.push('down');
-  if (target.y < head.y) wants.push('up');
-  for (const w of wants) if (!isOpposite(w, cur)) return w;
-  // 目标正好在身后：先横向/纵向绕一步
-  const side = cur === 'left' || cur === 'right' ? ['down', 'up'] : ['right', 'left'];
-  return head.y < s.rows / 2 || head.x < s.cols / 2 ? side[0] : side[1];
+  const head = s.snake[0];
+  const first = new Int16Array(n).fill(-1);
+  const names = Object.keys(VEC);
+  const queue = [];
+  names.forEach((d, k) => {
+    if (isOpposite(d, cur)) return;
+    const i = step(head.x, head.y, d);
+    if (i >= 0 && first[i] < 0) {
+      first[i] = k;
+      queue.push(i);
+    }
+  });
+  const goal = target.y * cols + target.x;
+  for (let q = 0; q < queue.length; q++) {
+    const c = queue[q];
+    if (c === goal) return names[first[c]];
+    for (const d of names) {
+      const i = step(c % cols, (c / cols) | 0, d);
+      if (i >= 0 && first[i] < 0) {
+        first[i] = first[c];
+        queue.push(i);
+      }
+    }
+  }
+  // 没有路：选能走到的格子最多的方向
+  let best = cur;
+  let bestCount = -1;
+  names.forEach((d, k) => {
+    if (isOpposite(d, cur)) return;
+    let count = 0;
+    for (let i = 0; i < n; i++) if (first[i] === k) count++;
+    if (count > bestCount) {
+      bestCount = count;
+      best = d;
+    }
+  });
+  return best;
 }
 
 /** 用 CDP 发送真实触摸事件，模拟一次滑动。 */
@@ -144,6 +191,21 @@ async function steerUntilScore(page, method, minScore, cdp, maxTicks = 600) {
   throw new Error('在限定 tick 数内没有吃到食物（method=' + method + '）');
 }
 
+/** 如果蛇头下一步会撞墙/撞到自己，先用一次真实按键转向棋盘中央。 */
+async function ensureSafeHeading(page) {
+  const s = await getState(page);
+  const d = dirName(s.queue.length ? s.queue[0] : s.dir);
+  const h = s.snake[0];
+  const nx = h.x + VEC[d][0];
+  const ny = h.y + VEC[d][1];
+  const out = nx < 0 || ny < 0 || nx >= s.cols || ny >= s.rows;
+  const hitsBody = s.snake.slice(0, -1).some((p) => p.x === nx && p.y === ny);
+  if ((out && !s.wrap) || hitsBody) {
+    const want = planTowards(s, { x: Math.floor(s.cols / 2), y: Math.floor(s.rows / 2) });
+    await page.keyboard.press(KEYS[want]);
+  }
+}
+
 async function screenshot(page, name, opts) {
   fs.mkdirSync(SHOT_DIR, { recursive: true });
   // 等浮层淡入动画结束再截图；游戏进行中截图时不能等（蛇会一直往前走）
@@ -167,6 +229,7 @@ module.exports = {
   tapDpad,
   overlaps,
   sendInput,
+  ensureSafeHeading,
   tick,
   setManualClock,
   steerUntilScore,

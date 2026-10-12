@@ -7,6 +7,7 @@
   const Store = window.SnakeStorage;
   const Render = window.SnakeRender;
   const AI = window.SnakeAI || null;
+  const Sound = window.SnakeAudio || { unlock() {}, play() {}, setEnabled() {}, log: [] };
 
   const $ = (id) => document.getElementById(id);
   const appEl = $('app');
@@ -45,6 +46,25 @@
     return isPortraitWindow() ? GRID_PORTRAIT : GRID_LANDSCAPE;
   }
 
+  // ---------- 反馈：震动（安卓外壳）与音效 ----------
+  /**
+   * 震动通过外壳注入的 window.Android.vibrate(ms)。普通浏览器里没有这个对象，
+   * 这里就什么也不做（按需求降级为空操作，不调用 navigator.vibrate）。
+   */
+  function vibrate(ms) {
+    if (!settings.vibration || mode === 'demo') return;
+    try {
+      if (window.Android && typeof window.Android.vibrate === 'function') window.Android.vibrate(ms);
+    } catch (e) { /* 外壳不可用时忽略 */ }
+  }
+  function sound(name) {
+    Sound.play(name);
+  }
+  // 自动播放策略：第一次触摸/按键时才创建 AudioContext
+  const unlockAudio = () => Sound.unlock();
+  document.addEventListener('pointerdown', unlockAudio, true);
+  document.addEventListener('keydown', unlockAudio, true);
+
   // ---------- 主题 ----------
   function resolveTheme() {
     if (settings.theme === 'light' || settings.theme === 'dark') return settings.theme;
@@ -75,6 +95,7 @@
     document.querySelectorAll('.overlay').forEach((el) => {
       el.classList.toggle('hidden', el.dataset.screen !== name);
     });
+    appEl.classList.toggle('demo', mode === 'demo');
     const dpadOn = settings.dpad && GAME_SCREENS.has(name) && mode !== 'demo';
     if (appEl.classList.contains('dpad-on') !== dpadOn) {
       appEl.classList.toggle('dpad-on', dpadOn);
@@ -94,9 +115,12 @@
     if (resized) layout();
   }
 
+  let lastEatTick = 0;
   function enterPlaying() {
     acc = 0;
     alpha = 0;
+    lastEatTick = 0;
+    renderer.clearEffects();
     cancelPending();
     showScreen('playing');
     blurActive();
@@ -197,23 +221,48 @@
 
   function handleEvents(events) {
     for (const ev of events) {
+      const c = renderer.colors;
       switch (ev.type) {
         case 'eat':
-        case 'powerup':
+          lastEatTick = state.ticks;
+          renderer.burst(ev.x, ev.y, c.food, 18, 3.4);
+          renderer.burst(ev.x, ev.y, c.light, 8, 2.2);
+          renderer.floatText(ev.x, ev.y, '+' + ev.points, ev.points > Core.FOOD_POINTS ? c.pu.double : c.text);
+          sound('eat');
+          vibrate(15);
           updateHud();
           break;
-        case 'die':
+        case 'powerup':
+          renderer.burst(ev.x, ev.y, c.pu[ev.kind], 26, 4.2);
+          renderer.floatText(ev.x, ev.y, Core.POWERUPS[ev.kind].name, c.pu[ev.kind]);
+          sound('powerup');
+          vibrate(35);
+          updateHud();
+          break;
+        case 'die': {
+          const h = state.snake[0];
+          renderer.burst(h.x, h.y, c.snake, 22, 3);
+          renderer.shake(480, Math.max(8, renderer.view.cell * 0.4));
+          sound('die');
+          vibrate(240);
           onGameEnd('dead');
           break;
+        }
         case 'win':
+          sound('level');
+          vibrate(80);
           onGameEnd('won');
           break;
         case 'allClear':
           unlocked = Levels.LEVELS.length;
           store.saveUnlocked(unlocked);
+          sound('level');
+          vibrate(80);
           onGameEnd('allClear');
           break;
         case 'levelComplete':
+          sound('level');
+          vibrate(60);
           onLevelComplete();
           break;
         default:
@@ -266,6 +315,15 @@
       el.querySelector('.bar').style.width = ((left / e.duration) * 100).toFixed(1) + '%';
       el.classList.toggle('ending', left < 1500);
     }
+  }
+
+  let toastTimer = null;
+  function toast(text) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
   }
 
   // ---------- 菜单内容 ----------
@@ -326,6 +384,7 @@
 
   function saveSettings() {
     settings = store.saveSettings(settings);
+    Sound.setEnabled(settings.sound);
     syncControls();
   }
 
@@ -350,12 +409,15 @@
       return;
     }
     const btn = e.target.closest('[data-action]');
-    if (btn && actions[btn.dataset.action]) actions[btn.dataset.action]();
+    if (btn && actions[btn.dataset.action]) {
+      sound('click');
+      actions[btn.dataset.action]();
+    }
   });
   $('btn-pause').addEventListener('click', () => (screen === 'pause' ? resume() : pause()));
 
   $('opt-wrap').addEventListener('change', (e) => { settings.wrap = e.target.checked; saveSettings(); });
-  $('set-sound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); });
+  $('set-sound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); Sound.setEnabled(settings.sound); });
   $('set-vibration').addEventListener('change', (e) => { settings.vibration = e.target.checked; saveSettings(); });
   $('set-dpad').addEventListener('change', (e) => { settings.dpad = e.target.checked; saveSettings(); });
   $('opt-speed').addEventListener('click', (e) => {
@@ -432,6 +494,11 @@
 
   // 滑动：移动超过阈值就立即转向，同一次滑动中可以连续转弯
   let swipe = null;
+  // 演示模式下点画面暂停。用 click 而不是 pointerdown：否则暂停层在手指按下时就弹出，
+  // 随后合成的 click 会落到暂停层的按钮上（点击穿透），演示立刻又被“重新开始”。
+  stage.addEventListener('click', () => {
+    if (mode === 'demo' && screen === 'playing') pause();
+  });
   stage.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     swipe = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -497,6 +564,13 @@
     if (mode === 'demo' && AI) state = Core.enqueueDir(state, AI.decide(state));
     state = Core.step(state);
     handleEvents(state.events);
+    // 演示模式：AI 到了后期可能一直安全地追尾巴、不敢吃食物。太久没吃到就记分并重开一局
+    if (mode === 'demo' && state.status === 'playing' && state.ticks - lastEatTick > state.cols * state.rows * 2) {
+      store.recordScore('demo', state.score, 'AI');
+      best = store.loadBest();
+      toast(`AI 绕圈太久，重新开局（本局 ${state.score} 分）`);
+      startDemo();
+    }
   }
 
   function frame(now) {
@@ -567,6 +641,8 @@
       getMode: () => mode,
       getSettings: () => Object.assign({}, settings),
       getUnlocked: () => unlocked,
+      getSoundLog: () => Sound.log.slice(),
+      getEffects: () => ({ particles: renderer.effectCount, shaking: renderer.shaking }),
       getView: () => {
         const r = $('board').getBoundingClientRect();
         return { left: r.left, top: r.top, width: r.width, height: r.height, cell: renderer.view.cell };
@@ -586,6 +662,7 @@
 
   // ---------- 启动 ----------
   if (!AI) document.querySelectorAll('[data-action="start-demo"]').forEach((b) => b.classList.add('hidden'));
+  Sound.setEnabled(settings.sound);
   applyTheme();
   syncControls();
   showScreen('menu');

@@ -71,6 +71,7 @@ for (const vp of VIEWPORTS) {
       assert.ok(s3.score > s2.score, '屏幕方向键操作后分数应继续增加');
 
       // 4) 道具：在蛇头下一格放一个“双倍分数”，推进一个 tick 后 HUD 出现倒计时
+      await H.ensureSafeHeading(page);
       assert.ok(await page.evaluate(() => window.SnakeApp.debug.placePowerupAhead('double')));
       await H.tick(page, 1);
       const chip = page.locator('#hud-effects .chip[data-effect="double"]');

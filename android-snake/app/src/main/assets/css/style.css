@@ -143,7 +143,30 @@ button:disabled { cursor: default; }
   min-height: 0;
   touch-action: none;
 }
-#board { position: absolute; display: block; border-radius: 10px; }
+#board { position: absolute; display: block; border-radius: 10px; will-change: transform; }
+
+#demo-badge {
+  display: none;
+  position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
+  padding: 6px 14px; border-radius: 999px;
+  background: var(--surface); color: var(--muted);
+  font-size: 14px; font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .14);
+  pointer-events: none;
+  opacity: .92;
+}
+#app[data-screen="playing"].demo #demo-badge { display: block; }
+
+.toast {
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 10px 18px; border-radius: 14px;
+  background: var(--text); color: var(--bg);
+  font-size: 15px; font-weight: 600;
+  box-shadow: var(--shadow);
+  z-index: 5;
+  animation: fade-in .2s ease-out;
+}
 
 #dpad {
   display: none;

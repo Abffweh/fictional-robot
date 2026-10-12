@@ -13,6 +13,10 @@
     let staticLayer = null;
     let staticFor = null; // { walls, cols, rows, cell, dpr, colors }
     let food = { key: '', born: 0 };
+    let particles = [];
+    let floaters = [];
+    let shaking = null;
+    let lastNow = 0;
 
     function readColors() {
       const cs = getComputedStyle(document.documentElement);
@@ -271,8 +275,90 @@
       ctx.restore();
     }
 
+    // ---------- 特效：粒子、飘字、屏幕震动 ----------
+    /** 在格子 (x, y) 处炸开一圈粒子。 */
+    function burst(x, y, color, count, speed) {
+      const n = count || 16;
+      const sp = speed || 3.2;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + Math.random() * 0.5;
+        const v = sp * (0.45 + Math.random() * 0.75);
+        particles.push({
+          x: x + 0.5, y: y + 0.5,
+          vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+          life: 0, max: 380 + Math.random() * 320,
+          r: 0.07 + Math.random() * 0.09,
+          color,
+        });
+      }
+      if (particles.length > 400) particles.splice(0, particles.length - 400);
+    }
+
+    function floatText(x, y, text, color) {
+      floaters.push({ x: x + 0.5, y: y + 0.2, text, color, life: 0, max: 850 });
+      if (floaters.length > 12) floaters.shift();
+    }
+
+    function shake(ms, px) {
+      shaking = { start: performance.now(), dur: ms || 420, amp: px || 12 };
+    }
+
+    function clearEffects() {
+      particles = [];
+      floaters = [];
+      shaking = null;
+      canvas.style.transform = '';
+    }
+
+    function drawEffects(dt) {
+      const sec = dt / 1000;
+      particles = particles.filter((p) => (p.life += dt) < p.max);
+      for (const p of particles) {
+        p.x += p.vx * sec;
+        p.y += p.vy * sec;
+        p.vx *= 0.96;
+        p.vy = p.vy * 0.96 + 3 * sec; // 轻微下落
+        ctx.globalAlpha = Math.max(0, 1 - p.life / p.max);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (1 - 0.5 * (p.life / p.max)), 0, TAU);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      floaters = floaters.filter((f) => (f.life += dt) < f.max);
+      if (floaters.length) {
+        ctx.save();
+        ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+        ctx.font = `800 ${Math.round(view.cell * 0.55)}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const f of floaters) {
+          const k = f.life / f.max;
+          ctx.globalAlpha = 1 - k * k;
+          ctx.fillStyle = f.color;
+          ctx.fillText(f.text, f.x * view.cell, (f.y - k * 1.1) * view.cell);
+        }
+        ctx.restore();
+      }
+    }
+
+    function applyShake(now) {
+      if (!shaking) return;
+      const k = (now - shaking.start) / shaking.dur;
+      if (k >= 1) {
+        shaking = null;
+        canvas.style.transform = '';
+        return;
+      }
+      const a = shaking.amp * (1 - k) * (1 - k);
+      canvas.style.transform = `translate(${((Math.random() * 2 - 1) * a).toFixed(1)}px, ${((Math.random() * 2 - 1) * a).toFixed(1)}px)`;
+    }
+
     function draw(state, alpha, now) {
       if (!colors) readColors();
+      const dt = lastNow ? Math.min(50, Math.max(0, now - lastNow)) : 16;
+      lastNow = now;
+      applyShake(now);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (!state) return;
@@ -294,9 +380,17 @@
       drawPowerup(state, now);
       drawFood(state, now);
       drawSnake(state, state.status === 'playing' ? alpha : 1, now);
+      drawEffects(dt);
     }
 
-    return { layout, draw, readColors, get view() { return view; }, snakePoints };
+    return {
+      layout, draw, readColors, burst, floatText, shake, clearEffects,
+      get colors() { return colors; },
+      get view() { return view; },
+      get effectCount() { return particles.length + floaters.length; },
+      get shaking() { return !!shaking; },
+      snakePoints,
+    };
   }
 
   root.SnakeRender = { create };
