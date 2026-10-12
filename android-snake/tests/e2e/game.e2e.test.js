@@ -17,20 +17,6 @@ test.after(async () => {
   if (browser) await browser.close();
 });
 
-/** 棋盘完整地落在视口内，且不与屏幕方向键重叠。 */
-async function assertLayout(page, vp) {
-  const v = await page.evaluate(() => window.SnakeApp.debug.getView());
-  assert.ok(v.left >= 0 && v.top >= 0, '棋盘不能超出左上');
-  assert.ok(v.left + v.width <= vp.width + 0.5 && v.top + v.height <= vp.height + 0.5, '棋盘不能超出右下');
-  assert.ok(v.cell >= 24, `格子太小：${v.cell}px`);
-  const dpad = page.locator('#dpad');
-  if (await dpad.isVisible()) {
-    const box = await dpad.boundingBox();
-    assert.ok(!H.overlaps({ x: v.left, y: v.top, width: v.width, height: v.height }, box), '棋盘与方向键重叠');
-    assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= vp.width && box.y + box.height <= vp.height, '方向键超出屏幕');
-  }
-}
-
 for (const vp of VIEWPORTS) {
   test(`经典模式：键盘/方向键/滑动、道具倒计时、结束层、最高分 @ ${vp.name}`, async () => {
     const { context, page, errors } = await H.openGame(browser, { width: vp.width, height: vp.height });
@@ -49,7 +35,7 @@ for (const vp of VIEWPORTS) {
       if (vp.height > vp.width) assert.ok(s0.rows > s0.cols, '竖屏应使用竖向棋盘');
       else assert.ok(s0.cols > s0.rows, '横屏应使用横向棋盘');
       assert.ok(await page.locator('#dpad').isVisible(), '默认显示屏幕方向键');
-      await assertLayout(page, vp);
+      await H.assertLayout(page, vp);
 
       // 0) 实时循环在跑：不操作时蛇会自己前进
       await page.waitForFunction(() => window.SnakeApp.debug.getState().ticks >= 3, null, { timeout: 5000 });
@@ -187,7 +173,7 @@ for (const vp of VIEWPORTS) {
       assert.match(await page.textContent('#hud-mode'), /第3关/);
       assert.equal(await page.textContent('#hud-progress'), `3/${s.target}`);
       assert.equal(await page.locator('#dpad').isVisible(), false, '关闭后不显示方向键');
-      await assertLayout(page, vp);
+      await H.assertLayout(page, vp);
       await H.screenshot(page, `${vp.name}-08-level3-dark`);
 
       // 返回键语义：游戏中 → 暂停（true）；已暂停 → 交给外壳退出（false）

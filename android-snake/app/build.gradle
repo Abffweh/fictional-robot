@@ -14,7 +14,22 @@ android {
         versionName '1.0.0'
     }
 
+    // 固定的 debug 签名：CI 每次都在全新机器上构建，如果用自动生成的 debug 密钥，
+    // 每个 APK 的签名都不同，装新版时必须先卸载（本地记录会丢）。
+    // 这是公开口令（android）的 debug 密钥，只适合个人自用，不能用于上架。
+    signingConfigs {
+        debug {
+            storeFile rootProject.file('keystore/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
         }

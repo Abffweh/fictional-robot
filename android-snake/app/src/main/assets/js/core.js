@@ -319,6 +319,44 @@
     return s;
   }
 
+  // ---------- 渲染插值（纯函数，渲染层每帧调用） ----------
+  /** 相邻两格之间的位移（-1/0/1），穿墙时取“绕过边界”的那个方向。 */
+  function wrapDelta(a, b, cols, rows) {
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    if (dx > 1) dx -= cols;
+    else if (dx < -1) dx += cols;
+    if (dy > 1) dy -= rows;
+    else if (dy < -1) dy += rows;
+    return { x: dx, y: dy };
+  }
+
+  /**
+   * 蛇身在两个 tick 之间的插值折线，t ∈ [0,1] 为当前 tick 内已过去的比例。
+   * 返回“展开”坐标（穿墙时不会横跨整个棋盘，可能落在棋盘外，渲染层再画对边副本）：
+   * 头部从上一格滑向当前格，尾巴从上一刻的位置收回，中间沿真实格子路径，所以拐角平滑。
+   * 还返回蛇头朝向 dir（插值中的移动方向）。
+   */
+  function interpolatePath(state, t) {
+    const s = state.snake;
+    const n = s.length;
+    const u = [{ x: s[0].x, y: s[0].y }];
+    for (let i = 1; i < n; i++) {
+      const d = wrapDelta(s[i - 1], s[i], state.cols, state.rows);
+      u.push({ x: u[i - 1].x + d.x, y: u[i - 1].y + d.y });
+    }
+    const moving = state.ticks > 0 && n > 1;
+    const k = Math.max(0, Math.min(1, t));
+    const pts = [moving ? { x: u[1].x + (u[0].x - u[1].x) * k, y: u[1].y + (u[0].y - u[1].y) * k } : u[0]];
+    for (let i = 1; i < n; i++) pts.push(u[i]);
+    if (moving && state.prevTail) {
+      const d = wrapDelta(s[n - 1], state.prevTail, state.cols, state.rows);
+      pts.push({ x: u[n - 1].x + d.x * (1 - k), y: u[n - 1].y + d.y * (1 - k) });
+    }
+    const dir = moving ? { x: u[0].x - u[1].x, y: u[0].y - u[1].y } : state.dir;
+    return { pts, dir };
+  }
+
   function die(s, reason, events, rng) {
     s.status = 'dead';
     s.deathReason = reason;
@@ -353,5 +391,7 @@
     canWrap,
     nextHead,
     step,
+    wrapDelta,
+    interpolatePath,
   };
 });

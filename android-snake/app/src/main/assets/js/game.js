@@ -271,6 +271,19 @@
     }
   }
 
+  /**
+   * 回主菜单。如果是在“过关”浮层上不再继续（不点下一关），这一轮闯关到此结束，
+   * 记一次闯关成绩；死亡/通关时的成绩已在 onGameEnd 里记过。
+   */
+  function goMenu() {
+    cancelPending();
+    if (screen === 'levelDone' && state && state.status === 'levelComplete' && state.score > 0) {
+      store.recordScore('level', state.score, scoreDetail(state));
+      best = store.loadBest();
+    }
+    showScreen('menu');
+  }
+
   // ---------- HUD ----------
   function modeLabel(s) {
     if (s.mode === 'level') return `第${s.levelIndex + 1}关 ${Levels.LEVELS[s.levelIndex].name}`;
@@ -399,7 +412,7 @@
     'start-demo': startDemo,
     resume,
     restart,
-    menu: () => { cancelPending(); showScreen('menu'); },
+    menu: goMenu,
     'next-level': nextLevel,
   };
   document.addEventListener('click', (e) => {
@@ -573,9 +586,12 @@
     }
   }
 
+  const frameTimes = []; // 最近 1 秒内每帧的时间戳，用于统计实际帧率
   function frame(now) {
     const dt = Math.min(250, Math.max(0, now - lastFrame));
     lastFrame = now;
+    frameTimes.push(now);
+    while (frameTimes.length && frameTimes[0] < now - 1000) frameTimes.shift();
     if (canAdvance() && !manualClock) {
       acc += dt;
       let interval = Core.tickInterval(state);
@@ -602,8 +618,7 @@
         return true;
       }
       if (screen === 'pause' || screen === 'menu') return false;
-      cancelPending();
-      showScreen('menu');
+      goMenu();
       return true;
     },
     onAppPause() {
@@ -641,6 +656,7 @@
       getMode: () => mode,
       getSettings: () => Object.assign({}, settings),
       getUnlocked: () => unlocked,
+      getFps: () => frameTimes.length,
       getSoundLog: () => Sound.log.slice(),
       getEffects: () => ({ particles: renderer.effectCount, shaking: renderer.shaking }),
       getView: () => {

@@ -92,39 +92,6 @@
       staticFor = { walls: state.walls, cols: state.cols, rows: state.rows, cell: view.cell, dpr: view.dpr };
     }
 
-    /** 两格之间的位移，考虑穿墙（-1/0/1）。 */
-    function delta(a, b, cols, rows) {
-      let dx = b.x - a.x;
-      let dy = b.y - a.y;
-      if (dx > 1) dx -= cols;
-      else if (dx < -1) dx += cols;
-      if (dy > 1) dy -= rows;
-      else if (dy < -1) dy += rows;
-      return { x: dx, y: dy };
-    }
-
-    /**
-     * 插值后的蛇身折线（“展开”坐标，穿墙时不会横跨整个棋盘）：
-     * 头部从上一格滑向当前格，尾巴从上一刻的尾巴位置收回，中间沿真实格子路径，拐角平滑。
-     */
-    function snakePoints(s, t) {
-      const n = s.snake.length;
-      const u = [{ x: s.snake[0].x, y: s.snake[0].y }];
-      for (let i = 1; i < n; i++) {
-        const d = delta(s.snake[i - 1], s.snake[i], s.cols, s.rows);
-        u.push({ x: u[i - 1].x + d.x, y: u[i - 1].y + d.y });
-      }
-      const moving = s.ticks > 0 && n > 1;
-      const pts = [moving ? { x: u[1].x + (u[0].x - u[1].x) * t, y: u[1].y + (u[0].y - u[1].y) * t } : u[0]];
-      for (let i = 1; i < n; i++) pts.push(u[i]);
-      if (moving && s.prevTail) {
-        const d = delta(s.snake[n - 1], s.prevTail, s.cols, s.rows);
-        pts.push({ x: u[n - 1].x + d.x * (1 - t), y: u[n - 1].y + d.y * (1 - t) });
-      }
-      const dir = moving ? { x: u[0].x - u[1].x, y: u[0].y - u[1].y } : s.dir;
-      return { pts, dir };
-    }
-
     function drawFood(state, now) {
       const f = state.food;
       if (!f) return;
@@ -240,7 +207,7 @@
     }
 
     function drawSnake(state, t, now) {
-      const path = snakePoints(state, t);
+      const path = Core.interpolatePath(state, t);
       const ghost = Core.effectActive(state, 'ghost');
       const ghostLeft = state.effects.ghost - state.time;
       const style = {
@@ -389,7 +356,6 @@
       get view() { return view; },
       get effectCount() { return particles.length + floaters.length; },
       get shaking() { return !!shaking; },
-      snakePoints,
     };
   }
 

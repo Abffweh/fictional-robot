@@ -173,6 +173,7 @@ async function steerUntilScore(page, method, minScore, cdp, maxTicks = 600) {
   const trace = [];
   for (let i = 0; i < maxTicks; i++) {
     const s = await getState(page);
+    if (s.status === 'levelComplete' || s.status === 'won') return s; // 过关/通关也算结束
     if (s.status !== 'playing') {
       throw new Error('蛇在测试操作中死亡：' + s.deathReason + '\n' + trace.slice(-6).join('\n'));
     }
@@ -206,6 +207,21 @@ async function ensureSafeHeading(page) {
   }
 }
 
+/** 棋盘完整地落在视口内，且不与屏幕方向键重叠。 */
+async function assertLayout(page, vp) {
+  const assert = require('node:assert/strict');
+  const v = await page.evaluate(() => window.SnakeApp.debug.getView());
+  assert.ok(v.left >= 0 && v.top >= 0, '棋盘不能超出左上');
+  assert.ok(v.left + v.width <= vp.width + 0.5 && v.top + v.height <= vp.height + 0.5, '棋盘不能超出右下');
+  assert.ok(v.cell >= 24, `格子太小：${v.cell}px`);
+  const dpad = page.locator('#dpad');
+  if (await dpad.isVisible()) {
+    const box = await dpad.boundingBox();
+    assert.ok(!overlaps({ x: v.left, y: v.top, width: v.width, height: v.height }, box), '棋盘与方向键重叠');
+    assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= vp.width && box.y + box.height <= vp.height, '方向键超出屏幕');
+  }
+}
+
 async function screenshot(page, name, opts) {
   fs.mkdirSync(SHOT_DIR, { recursive: true });
   // 等浮层淡入动画结束再截图；游戏进行中截图时不能等（蛇会一直往前走）
@@ -230,6 +246,7 @@ module.exports = {
   overlaps,
   sendInput,
   ensureSafeHeading,
+  assertLayout,
   tick,
   setManualClock,
   steerUntilScore,
