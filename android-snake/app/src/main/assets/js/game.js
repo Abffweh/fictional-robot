@@ -1,118 +1,430 @@
-/* 贪吃蛇界面层（M1 最简版）：渲染、输入、游戏循环、与安卓外壳的桥接。 */
+/* 贪吃蛇界面层：界面切换、输入、游戏循环、HUD、设置/排行榜，以及与安卓外壳的桥接。 */
 (function () {
   'use strict';
 
   const Core = window.SnakeCore;
+  const Levels = window.SnakeLevels;
+  const Store = window.SnakeStorage;
+  const Render = window.SnakeRender;
+  const AI = window.SnakeAI || null;
+
   const $ = (id) => document.getElementById(id);
+  const appEl = $('app');
+  const stage = $('stage');
+  const effectsEl = $('hud-effects');
 
   const GRID_LANDSCAPE = { cols: 26, rows: 16 };
   const GRID_PORTRAIT = { cols: 16, rows: 26 };
-  const BEST_KEY = 'snake.v1.best';
+  const GAME_SCREENS = new Set(['playing', 'pause', 'over', 'levelDone']);
 
-  // ---------- 存储（全部 try/catch） ----------
-  function readBest() {
-    try {
-      const v = JSON.parse(localStorage.getItem(BEST_KEY) || '{}');
-      return v && typeof v === 'object' ? v : {};
-    } catch (e) {
-      return {};
-    }
-  }
-  function writeBest(obj) {
-    try {
-      localStorage.setItem(BEST_KEY, JSON.stringify(obj));
-    } catch (e) { /* 存储不可用时忽略 */ }
-  }
+  // ---------- 数据与设置 ----------
+  const store = Store.createStore(Store.browserBackend());
+  let settings = store.loadSettings();
+  let best = store.loadBest();
+  let unlocked = store.loadUnlocked(Levels.LEVELS.length);
+  let androidDark = null;
 
-  // ---------- 状态 ----------
-  const canvas = $('board');
-  const ctx = canvas.getContext('2d');
-  const stage = $('stage');
-  let state = null;
+  const renderer = Render.create($('board'));
+
   let screen = 'menu';
+  let mode = 'classic';
+  let state = null;
   let acc = 0;
   let alpha = 1;
   let lastFrame = performance.now();
-  let view = { cell: 20, ox: 0, oy: 0, w: 0, h: 0, dpr: 1 };
-  let best = readBest();
+  let pending = null; // { screen, timer }：结束动画播放完后要显示的浮层
+  let wasPortrait = isPortraitWindow();
 
-  function isPortrait() {
-    return stage.clientHeight > stage.clientWidth;
+  function newSeed() {
+    return (Math.random() * 4294967296) >>> 0;
+  }
+  function isPortraitWindow() {
+    return window.innerHeight > window.innerWidth;
+  }
+  function gridForWindow() {
+    return isPortraitWindow() ? GRID_PORTRAIT : GRID_LANDSCAPE;
   }
 
+  // ---------- 主题 ----------
+  function resolveTheme() {
+    if (settings.theme === 'light' || settings.theme === 'dark') return settings.theme;
+    if (androidDark !== null) return androidDark ? 'dark' : 'light';
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  }
+  function applyTheme() {
+    document.documentElement.dataset.theme = resolveTheme();
+    renderer.readColors();
+  }
+  try {
+    if (window.Android && typeof window.Android.isSystemDark === 'function') androidDark = !!window.Android.isSystemDark();
+  } catch (e) {
+    androidDark = null;
+  }
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  } catch (e) { /* 旧内核不支持时忽略 */ }
+
+  // ---------- 界面切换 ----------
   function showScreen(name) {
     screen = name;
+    appEl.dataset.screen = name;
     document.querySelectorAll('.overlay').forEach((el) => {
       el.classList.toggle('hidden', el.dataset.screen !== name);
     });
+    const dpadOn = settings.dpad && GAME_SCREENS.has(name) && mode !== 'demo';
+    if (appEl.classList.contains('dpad-on') !== dpadOn) {
+      appEl.classList.toggle('dpad-on', dpadOn);
+      layout();
+    }
+    $('btn-pause').setAttribute('aria-label', name === 'pause' ? '继续' : '暂停');
   }
 
-  function newGame() {
-    const grid = isPortrait() ? GRID_PORTRAIT : GRID_LANDSCAPE;
-    state = Core.createGame({
-      cols: grid.cols,
-      rows: grid.rows,
-      mode: 'classic',
-      wrap: $('opt-wrap').checked,
-      speed: 'normal',
-      seed: (Math.random() * 2 ** 32) >>> 0,
-    });
+  function blurActive() {
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
+
+  // ---------- 开局 / 结束 ----------
+  function setState(s) {
+    const resized = !state || state.cols !== s.cols || state.rows !== s.rows;
+    state = s;
+    if (resized) layout();
+  }
+
+  function enterPlaying() {
     acc = 0;
-    alpha = 1;
-    layout();
-    updateHud();
+    alpha = 0;
+    cancelPending();
     showScreen('playing');
+    blurActive();
+    updateHud();
+  }
+
+  function startClassic() {
+    const g = gridForWindow();
+    mode = 'classic';
+    setState(Core.createGame({ cols: g.cols, rows: g.rows, mode: 'classic', wrap: settings.wrap, speed: settings.speed, seed: newSeed() }));
+    enterPlaying();
+  }
+
+  function startLevel(index) {
+    const g = gridForWindow();
+    mode = 'level';
+    setState(Levels.createLevelGame(index, { cols: g.cols, rows: g.rows, seed: newSeed() }));
+    enterPlaying();
+  }
+
+  function nextLevel() {
+    if (!state || state.levelIndex === null || state.levelIndex + 1 >= Levels.LEVELS.length) return;
+    const g = gridForWindow();
+    setState(Levels.createLevelGame(state.levelIndex + 1, { cols: g.cols, rows: g.rows, seed: state.seed, score: state.score }));
+    enterPlaying();
+  }
+
+  function startDemo() {
+    if (!AI) return;
+    const g = gridForWindow();
+    mode = 'demo';
+    setState(Core.createGame({ cols: g.cols, rows: g.rows, mode: 'demo', wrap: false, speed: 'fast', seed: newSeed() }));
+    enterPlaying();
+  }
+
+  function restart() {
+    if (mode === 'level' && state) startLevel(state.levelIndex);
+    else if (mode === 'demo') startDemo();
+    else startClassic();
   }
 
   function pause() {
-    if (screen === 'playing') showScreen('pause');
+    if (screen === 'playing' && state && state.status === 'playing') showScreen('pause');
   }
   function resume() {
     if (screen === 'pause') {
       lastFrame = performance.now();
       showScreen('playing');
+      blurActive();
     }
   }
 
-  function gameOver() {
-    const key = 'classic';
-    if (state.score > (best[key] || 0)) {
-      best[key] = state.score;
-      writeBest(best);
-    }
+  function schedule(name, delay) {
+    cancelPending();
+    pending = { screen: name, timer: setTimeout(flushPending, delay) };
+  }
+  function flushPending() {
+    if (!pending) return;
+    const name = pending.screen;
+    clearTimeout(pending.timer);
+    pending = null;
+    if (screen === 'playing') showScreen(name);
+  }
+  function cancelPending() {
+    if (pending) clearTimeout(pending.timer);
+    pending = null;
+  }
+
+  function scoreDetail(s) {
+    if (s.mode === 'level') return `第${s.levelIndex + 1}关`;
+    if (s.mode === 'demo') return 'AI';
+    return `${s.wrap ? '穿墙' : '不穿墙'}·${Core.SPEED_NAMES[s.speed]}`;
+  }
+
+  function onGameEnd(kind) {
+    const res = store.recordScore(mode, state.score, scoreDetail(state));
+    best = store.loadBest();
+    const titles = { dead: '游戏结束', won: '满屏了，你赢了！', allClear: '全部通关！' };
+    $('over-title').textContent = mode === 'demo' && kind === 'dead' ? 'AI 撞上了' : titles[kind];
     $('over-score').textContent = state.score;
-    $('over-best').textContent = best[key] || 0;
+    $('over-best').textContent = res.best;
+    $('over-new').classList.toggle('hidden', !res.isBest);
+    $('over-rank').textContent = res.rank ? `进入本地排行榜第 ${res.rank} 名` : '';
     updateHud();
-    setTimeout(() => {
-      if (state && state.status !== 'playing' && screen === 'playing') showScreen('over');
-    }, 450);
+    schedule('over', kind === 'dead' ? 700 : 350);
+  }
+
+  function onLevelComplete() {
+    const i = state.levelIndex;
+    unlocked = Levels.unlockAfter(unlocked, i);
+    store.saveUnlocked(unlocked);
+    const next = Levels.LEVELS[i + 1];
+    $('ld-title').textContent = `第 ${i + 1} 关「${Levels.LEVELS[i].name}」完成！`;
+    $('ld-score').textContent = state.score;
+    $('ld-next').textContent = next ? `下一关：第 ${i + 2} 关「${next.name}」· 目标长度 ${next.target}` : '';
+    schedule('levelDone', 350);
+  }
+
+  function handleEvents(events) {
+    for (const ev of events) {
+      switch (ev.type) {
+        case 'eat':
+        case 'powerup':
+          updateHud();
+          break;
+        case 'die':
+          onGameEnd('dead');
+          break;
+        case 'win':
+          onGameEnd('won');
+          break;
+        case 'allClear':
+          unlocked = Levels.LEVELS.length;
+          store.saveUnlocked(unlocked);
+          onGameEnd('allClear');
+          break;
+        case 'levelComplete':
+          onLevelComplete();
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  // ---------- HUD ----------
+  function modeLabel(s) {
+    if (s.mode === 'level') return `第${s.levelIndex + 1}关 ${Levels.LEVELS[s.levelIndex].name}`;
+    if (s.mode === 'demo') return 'AI 演示';
+    return `经典·${s.wrap ? '穿墙' : '不穿墙'}·${Core.SPEED_NAMES[s.speed]}`;
   }
 
   function updateHud() {
-    $('hud-score').textContent = state ? state.score : 0;
-    $('hud-best').textContent = best.classic || 0;
+    if (!state) return;
+    $('hud-score').textContent = state.score;
+    $('hud-best').textContent = Math.max(best[mode] || 0, state.score);
+    $('hud-mode').textContent = modeLabel(state);
+    $('hud-progress').textContent = state.mode === 'level' ? `${state.snake.length}/${state.target}` : `长度 ${state.snake.length}`;
   }
+
+  const chipEls = {};
+  function renderEffects() {
+    const list = state && state.status === 'playing' ? Core.activeEffects(state) : [];
+    const active = new Set(list.map((e) => e.type));
+    for (const type of Object.keys(chipEls)) {
+      if (!active.has(type)) {
+        chipEls[type].remove();
+        delete chipEls[type];
+      }
+    }
+    for (const e of list) {
+      let el = chipEls[e.type];
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'chip';
+        el.dataset.effect = e.type;
+        el.style.setProperty('--c', `var(--pu-${e.type})`);
+        el.innerHTML = '<i class="dot"></i><span class="name"></span><span class="secs"></span><i class="bar"></i>';
+        el.querySelector('.name').textContent = e.name;
+        effectsEl.appendChild(el);
+        chipEls[e.type] = el;
+      }
+      // 剩余时间按游戏时间计算，再减去当前 tick 内已流逝的部分，倒计时更平滑。
+      // 暂停时 acc 不再累加，所以显示值会原样冻结。
+      const left = Math.max(0, e.remaining - acc);
+      el.querySelector('.secs').textContent = (left / 1000).toFixed(1) + 's';
+      el.querySelector('.bar').style.width = ((left / e.duration) * 100).toFixed(1) + '%';
+      el.classList.toggle('ending', left < 1500);
+    }
+  }
+
+  // ---------- 菜单内容 ----------
+  function renderLevelGrid() {
+    const grid = $('level-grid');
+    grid.textContent = '';
+    Levels.LEVELS.forEach((lv, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'level-card';
+      b.dataset.level = String(i);
+      b.disabled = i >= unlocked;
+      b.innerHTML = '<span class="lv-no"></span><span class="lv-name"></span><span class="lv-desc"></span><span class="lv-target"></span>';
+      b.querySelector('.lv-no').textContent = `第 ${i + 1} 关${i >= unlocked ? ' · 🔒 未解锁' : ''}`;
+      b.querySelector('.lv-name').textContent = lv.name;
+      b.querySelector('.lv-desc').textContent = lv.desc;
+      b.querySelector('.lv-target').textContent = `目标长度 ${lv.target}`;
+      grid.appendChild(b);
+    });
+  }
+
+  const MODE_NAMES = { classic: '经典', level: '闯关' };
+  function renderLeaderboard() {
+    best = store.loadBest();
+    $('lb-best-classic').textContent = best.classic;
+    $('lb-best-level').textContent = best.level;
+    $('lb-best-demo').textContent = best.demo;
+    const list = store.loadLeaderboard();
+    const body = $('lb-body');
+    body.textContent = '';
+    list.forEach((e, i) => {
+      const tr = document.createElement('tr');
+      const cells = [String(i + 1), String(e.score), `${MODE_NAMES[e.mode]}${e.detail ? '·' + e.detail : ''}`, e.date];
+      cells.forEach((text, j) => {
+        const td = document.createElement('td');
+        if (j === 0) td.className = 'rank';
+        td.textContent = text;
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    $('lb-empty').classList.toggle('hidden', list.length > 0);
+  }
+
+  function setSegmented(id, value) {
+    $(id).querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
+  }
+
+  function syncControls() {
+    $('opt-wrap').checked = settings.wrap;
+    setSegmented('opt-speed', settings.speed);
+    $('set-sound').checked = settings.sound;
+    $('set-vibration').checked = settings.vibration;
+    $('set-dpad').checked = settings.dpad;
+    setSegmented('set-theme', settings.theme);
+    $('storage-note').classList.toggle('hidden', store.persistent);
+  }
+
+  function saveSettings() {
+    settings = store.saveSettings(settings);
+    syncControls();
+  }
+
+  // ---------- 按钮 ----------
+  const actions = {
+    'go-classic': () => { syncControls(); showScreen('classic'); },
+    'go-levels': () => { renderLevelGrid(); showScreen('levels'); },
+    'go-settings': () => { syncControls(); showScreen('settings'); },
+    'go-leaderboard': () => { renderLeaderboard(); showScreen('leaderboard'); },
+    back: () => showScreen('menu'),
+    'start-classic': startClassic,
+    'start-demo': startDemo,
+    resume,
+    restart,
+    menu: () => { cancelPending(); showScreen('menu'); },
+    'next-level': nextLevel,
+  };
+  document.addEventListener('click', (e) => {
+    const lv = e.target.closest('[data-level]');
+    if (lv && !lv.disabled) {
+      startLevel(Number(lv.dataset.level));
+      return;
+    }
+    const btn = e.target.closest('[data-action]');
+    if (btn && actions[btn.dataset.action]) actions[btn.dataset.action]();
+  });
+  $('btn-pause').addEventListener('click', () => (screen === 'pause' ? resume() : pause()));
+
+  $('opt-wrap').addEventListener('change', (e) => { settings.wrap = e.target.checked; saveSettings(); });
+  $('set-sound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); });
+  $('set-vibration').addEventListener('change', (e) => { settings.vibration = e.target.checked; saveSettings(); });
+  $('set-dpad').addEventListener('change', (e) => { settings.dpad = e.target.checked; saveSettings(); });
+  $('opt-speed').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-value]');
+    if (b) { settings.speed = b.dataset.value; saveSettings(); }
+  });
+  $('set-theme').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-value]');
+    if (b) { settings.theme = b.dataset.value; saveSettings(); applyTheme(); }
+  });
+
+  let clearArmed = null;
+  $('btn-clear').addEventListener('click', () => {
+    const btn = $('btn-clear');
+    if (!clearArmed) {
+      btn.classList.add('confirm');
+      btn.textContent = '再点一次确认清除';
+      clearArmed = setTimeout(() => {
+        clearArmed = null;
+        btn.classList.remove('confirm');
+        btn.textContent = '清除所有记录';
+      }, 3000);
+      return;
+    }
+    clearTimeout(clearArmed);
+    clearArmed = null;
+    store.clearAll();
+    settings = store.loadSettings();
+    best = store.loadBest();
+    unlocked = store.loadUnlocked(Levels.LEVELS.length);
+    btn.classList.remove('confirm');
+    btn.textContent = '已清除';
+    setTimeout(() => { btn.textContent = '清除所有记录'; }, 1500);
+    syncControls();
+    applyTheme();
+  });
 
   // ---------- 输入 ----------
   function input(dir) {
-    if (screen !== 'playing' || !state) return;
+    if (screen !== 'playing' || !state || mode === 'demo') return;
     state = Core.enqueueDir(state, dir);
   }
 
   const KEYMAP = {
     ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
     KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
-    w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right',
   };
+  const KEYMAP_CHAR = { w: 'up', s: 'down', a: 'left', d: 'right' };
   document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.key === ' ') {
+    if (e.code === 'Space' || e.key === ' ' || e.code === 'KeyP') {
       e.preventDefault();
       if (screen === 'playing') pause();
       else if (screen === 'pause') resume();
       return;
     }
-    const dir = KEYMAP[e.code] || KEYMAP[e.key];
-    if (dir) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (screen === 'playing') pause();
+      else if (screen !== 'pause') window.SnakeApp.handleBack();
+      return;
+    }
+    if (e.key === 'Enter' && (screen === 'over' || screen === 'levelDone')) {
+      e.preventDefault();
+      if (screen === 'over') restart();
+      else nextLevel();
+      return;
+    }
+    const dir = KEYMAP[e.code] || KEYMAP_CHAR[(e.key || '').toLowerCase()];
+    if (dir && screen === 'playing') {
       e.preventDefault();
       input(dir);
     }
@@ -140,12 +452,19 @@
   stage.addEventListener('pointerup', endSwipe);
   stage.addEventListener('pointercancel', endSwipe);
 
-  $('btn-start').addEventListener('click', newGame);
-  $('btn-retry').addEventListener('click', newGame);
-  $('btn-pause').addEventListener('click', () => (screen === 'pause' ? resume() : pause()));
-  $('btn-resume').addEventListener('click', resume);
-  $('btn-pause-menu').addEventListener('click', () => showScreen('menu'));
-  $('btn-over-menu').addEventListener('click', () => showScreen('menu'));
+  // 屏幕方向键：按下即生效（不等 click），支持多指
+  document.querySelectorAll('.dpad-btn').forEach((btn) => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      btn.classList.add('pressed');
+      input(btn.dataset.dir);
+    });
+    const release = () => btn.classList.remove('pressed');
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('pointerleave', release);
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pause();
@@ -153,185 +472,123 @@
 
   // ---------- 布局 ----------
   function layout() {
-    const dpr = window.devicePixelRatio || 1;
-    const cols = state ? state.cols : GRID_LANDSCAPE.cols;
-    const rows = state ? state.rows : GRID_LANDSCAPE.rows;
-    const pad = 12;
-    const aw = Math.max(50, stage.clientWidth - pad * 2);
-    const ah = Math.max(50, stage.clientHeight - pad * 2);
-    const cell = Math.max(4, Math.floor(Math.min(aw / cols, ah / rows)));
-    const w = cell * cols;
-    const h = cell * rows;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
-    canvas.style.left = Math.round((stage.clientWidth - w) / 2) + 'px';
-    canvas.style.top = Math.round((stage.clientHeight - h) / 2) + 'px';
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    view = { cell, w, h, dpr };
+    const g = state || gridForWindow();
+    renderer.layout(stage.clientWidth, stage.clientHeight, g.cols, g.rows);
   }
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => layout()).observe(stage);
   window.addEventListener('resize', () => {
     layout();
-    if (screen === 'playing') pause();
+    const portrait = isPortraitWindow();
+    if (portrait !== wasPortrait) {
+      wasPortrait = portrait;
+      pause(); // 旋转后棋盘尺寸会变，先暂停让玩家看清楚
+    }
   });
 
-  // ---------- 渲染 ----------
-  function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
-  let colors = null;
-  function readColors() {
-    colors = {
-      a: cssVar('--board-a'), b: cssVar('--board-b'), snake: cssVar('--snake'),
-      light: cssVar('--snake-light'), food: cssVar('--food'), wall: cssVar('--wall'),
-    };
-  }
-
-  /** 两格之间的位移，考虑穿墙（-1/0/1）。 */
-  function delta(a, b, cols, rows) {
-    let dx = b.x - a.x;
-    let dy = b.y - a.y;
-    if (dx > 1) dx -= cols; else if (dx < -1) dx += cols;
-    if (dy > 1) dy -= rows; else if (dy < -1) dy += rows;
-    return { x: dx, y: dy };
-  }
-
-  /** 生成插值后的蛇身折线（不折返的“展开”坐标），沿真实格子路径走，拐角平滑。 */
-  function snakePoints(s, t) {
-    const n = s.snake.length;
-    const u = [{ x: s.snake[0].x, y: s.snake[0].y }];
-    for (let i = 1; i < n; i++) {
-      const d = delta(s.snake[i - 1], s.snake[i], s.cols, s.rows);
-      u.push({ x: u[i - 1].x + d.x, y: u[i - 1].y + d.y });
-    }
-    const moving = s.ticks > 0 && n > 1;
-    const pts = [];
-    pts.push(moving ? { x: u[1].x + (u[0].x - u[1].x) * t, y: u[1].y + (u[0].y - u[1].y) * t } : u[0]);
-    for (let i = 1; i < n; i++) pts.push(u[i]);
-    if (moving && s.prevTail) {
-      const d = delta(s.snake[n - 1], s.prevTail, s.cols, s.rows);
-      pts.push({ x: u[n - 1].x + d.x * (1 - t), y: u[n - 1].y + d.y * (1 - t) });
-    }
-    return pts;
-  }
-
-  function render() {
-    if (!colors) readColors();
-    const { cell, dpr } = view;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!state) return;
-    ctx.setTransform(dpr * cell, 0, 0, dpr * cell, 0, 0);
-
-    // 棋盘格背景
-    for (let y = 0; y < state.rows; y++) {
-      for (let x = 0; x < state.cols; x++) {
-        ctx.fillStyle = (x + y) % 2 ? colors.a : colors.b;
-        ctx.fillRect(x, y, 1, 1);
-      }
-    }
-
-    // 食物
-    if (state.food) {
-      const pulse = 0.36 + 0.04 * Math.sin(performance.now() / 160);
-      ctx.fillStyle = colors.food;
-      ctx.beginPath();
-      ctx.arc(state.food.x + 0.5, state.food.y + 0.5, pulse, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 蛇（考虑穿墙时在对边画出副本）
-    const t = state.status === 'playing' ? alpha : 1;
-    const pts = snakePoints(state, t);
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const p of pts) {
-      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-    }
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, state.cols, state.rows);
-    ctx.clip();
-    for (let kx = Math.floor((-1 - maxX) / state.cols) + 1; minX + kx * state.cols < state.cols; kx++) {
-      for (let ky = Math.floor((-1 - maxY) / state.rows) + 1; minY + ky * state.rows < state.rows; ky++) {
-        drawSnake(pts, kx * state.cols, ky * state.rows);
-      }
-    }
-    ctx.restore();
-  }
-
-  function drawSnake(pts, ox, oy) {
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    const path = () => {
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x + 0.5 + ox, pts[0].y + 0.5 + oy);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + 0.5 + ox, pts[i].y + 0.5 + oy);
-    };
-    ctx.strokeStyle = colors.snake;
-    ctx.lineWidth = 0.8;
-    path();
-    ctx.stroke();
-    ctx.strokeStyle = colors.light;
-    ctx.lineWidth = 0.34;
-    path();
-    ctx.stroke();
-    // 头
-    const h = pts[0];
-    ctx.fillStyle = colors.snake;
-    ctx.beginPath();
-    ctx.arc(h.x + 0.5 + ox, h.y + 0.5 + oy, 0.46, 0, Math.PI * 2);
-    ctx.fill();
-    const d = state.dir;
-    ctx.fillStyle = '#fff';
-    for (const side of [-1, 1]) {
-      const ex = h.x + 0.5 + ox + d.x * 0.15 + -d.y * side * 0.2;
-      const ey = h.y + 0.5 + oy + d.y * 0.15 + d.x * side * 0.2;
-      ctx.beginPath();
-      ctx.arc(ex, ey, 0.11, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
   // ---------- 主循环：逻辑 tick 与 60fps 渲染分离 ----------
+  let manualClock = false; // 仅供自动化测试：冻结实时时钟，改为手动推进 tick
+
+  function canAdvance() {
+    return screen === 'playing' && state && state.status === 'playing';
+  }
+
+  /** 推进一个逻辑 tick（AI 决策 → 核心 step → 处理事件）。 */
+  function advanceTick() {
+    if (mode === 'demo' && AI) state = Core.enqueueDir(state, AI.decide(state));
+    state = Core.step(state);
+    handleEvents(state.events);
+  }
+
   function frame(now) {
-    const dt = Math.min(250, now - lastFrame);
+    const dt = Math.min(250, Math.max(0, now - lastFrame));
     lastFrame = now;
-    if (screen === 'playing' && state && state.status === 'playing') {
+    if (canAdvance() && !manualClock) {
       acc += dt;
       let interval = Core.tickInterval(state);
-      while (acc >= interval && state.status === 'playing') {
+      let guard = 0;
+      while (acc >= interval && state.status === 'playing' && guard++ < 8) {
         acc -= interval;
-        state = Core.step(state);
-        for (const ev of state.events) {
-          if (ev.type === 'eat') updateHud();
-          if (ev.type === 'die' || ev.type === 'win') gameOver();
-        }
+        advanceTick();
         interval = Core.tickInterval(state);
       }
-      alpha = Math.min(1, acc / interval);
+      alpha = state.status === 'playing' ? Math.min(1, acc / interval) : 1;
     }
-    render();
+    if (GAME_SCREENS.has(screen)) renderEffects();
+    renderer.draw(state, alpha, now);
     requestAnimationFrame(frame);
   }
 
-  // ---------- 与安卓外壳的桥接 ----------
+  // ---------- 与安卓外壳的桥接（window.SnakeApp） ----------
   window.SnakeApp = {
+    /** 返回 true 表示网页已处理；false 表示外壳应退出应用。 */
     handleBack() {
-      if (screen === 'playing') { pause(); return true; }
-      if (screen === 'over') { showScreen('menu'); return true; }
-      return false;
+      if (screen === 'playing') {
+        if (state && state.status !== 'playing') flushPending();
+        else pause();
+        return true;
+      }
+      if (screen === 'pause' || screen === 'menu') return false;
+      cancelPending();
+      showScreen('menu');
+      return true;
     },
-    onAppPause() { pause(); },
-    onAppResume() { lastFrame = performance.now(); },
-    onSystemThemeChanged() {},
+    onAppPause() {
+      pause();
+    },
+    onAppResume() {
+      lastFrame = performance.now();
+    },
+    onSystemThemeChanged(dark) {
+      androidDark = !!dark;
+      applyTheme();
+    },
+    /**
+     * 测试/调试接口。除了只读查询，还有两个钩子：
+     * setManualClock/tick —— 冻结实时时钟、手动推进 tick，让端到端测试不受机器卡顿影响
+     *   （输入仍然走真实的键盘/触摸事件）；placePowerupAhead —— 验证道具与 HUD 计时。
+     */
     debug: {
-      getState: () => (state ? JSON.parse(JSON.stringify(Object.assign({}, state, { walls: null }))) : null),
+      setManualClock(on) {
+        manualClock = !!on;
+        acc = 0;
+        alpha = 1;
+        lastFrame = performance.now();
+      },
+      tick(n) {
+        let done = 0;
+        while (done < (n || 1) && canAdvance()) {
+          advanceTick();
+          done++;
+        }
+        return done;
+      },
+      getState: () => (state ? JSON.parse(JSON.stringify(Object.assign({}, state, { walls: null, wallCount: state.walls ? state.walls.reduce((a, b) => a + b, 0) : 0 }))) : null),
       getScreen: () => screen,
+      getMode: () => mode,
+      getSettings: () => Object.assign({}, settings),
+      getUnlocked: () => unlocked,
+      getView: () => {
+        const r = $('board').getBoundingClientRect();
+        return { left: r.left, top: r.top, width: r.width, height: r.height, cell: renderer.view.cell };
+      },
+      placePowerupAhead(type) {
+        if (!state || state.status !== 'playing') return false;
+        // 放在蛇头下一个 tick 要进入的格子
+        const h = state.snake[0];
+        const d = state.queue.length ? state.queue[0] : state.dir;
+        const x = Core.wrapCoord(h.x + d.x, state.cols);
+        const y = Core.wrapCoord(h.y + d.y, state.rows);
+        state = Object.assign({}, state, { powerup: { type, x, y, expires: state.time + Core.POWERUP_LIFETIME } });
+        return true;
+      },
     },
   };
 
+  // ---------- 启动 ----------
+  if (!AI) document.querySelectorAll('[data-action="start-demo"]').forEach((b) => b.classList.add('hidden'));
+  applyTheme();
+  syncControls();
+  showScreen('menu');
   layout();
-  updateHud();
   requestAnimationFrame(frame);
 })();

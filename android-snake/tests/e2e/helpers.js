@@ -84,34 +84,70 @@ async function swipe(page, cdp, dir) {
 }
 
 /**
- * 反复操作直到分数超过 minScore。method: 'keys' | 'wasd' | 'swipe'。
- * 返回最终状态；超时抛错。
+ * 用触摸点按屏幕方向键。直接走 CDP 发 touchStart/touchEnd：
+ * page.touchscreen.tap 每次要等几百毫秒，跟不上 tick 节奏。
  */
-async function steerUntilScore(page, method, minScore, cdp, timeoutMs = 30000) {
-  const deadline = Date.now() + timeoutMs;
-  let lastSent = null;
-  let lastTick = -1;
-  while (Date.now() < deadline) {
-    const s = await getState(page);
-    if (s.status !== 'playing') throw new Error('蛇在测试操作中死亡：' + s.deathReason);
-    if (s.score > minScore) return s;
-    if (s.ticks !== lastTick) {
-      lastTick = s.ticks;
-      const want = planTowards(s, s.food);
-      const queuedLast = s.queue.length ? dirName(s.queue[s.queue.length - 1]) : dirName(s.dir);
-      if (want !== queuedLast && !(lastSent === want && s.queue.length)) {
-        if (method === 'swipe') await swipe(page, cdp, want);
-        else await page.keyboard.press(method === 'wasd' ? WASD[want] : KEYS[want]);
-        lastSent = want;
-      }
+const dpadCenters = new WeakMap();
+async function tapDpad(page, cdp, dir) {
+  let centers = dpadCenters.get(page);
+  if (!centers) {
+    centers = {};
+    for (const d of Object.keys(VEC)) {
+      const box = await page.locator(`.dpad-btn[data-dir="${d}"]`).boundingBox();
+      centers[d] = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     }
-    await page.waitForTimeout(15);
+    dpadCenters.set(page, centers);
   }
-  throw new Error('在限定时间内没有吃到食物（method=' + method + '）');
+  const p = centers[dir];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
-async function screenshot(page, name) {
+/** 两个矩形是否重叠。 */
+function overlaps(a, b) {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+/** 发送一次方向输入（真实键盘 / 触摸滑动 / 触摸点按方向键）。 */
+async function sendInput(page, method, dir, cdp) {
+  if (method === 'swipe') await swipe(page, cdp, dir);
+  else if (method === 'dpad') await tapDpad(page, cdp, dir);
+  else await page.keyboard.press(method === 'wasd' ? WASD[dir] : KEYS[dir]);
+}
+
+const tick = (page, n) => page.evaluate((k) => window.SnakeApp.debug.tick(k), n || 1);
+const setManualClock = (page, on) => page.evaluate((v) => window.SnakeApp.debug.setManualClock(v), on);
+
+/**
+ * 在手动时钟下操作直到分数超过 minScore：每个 tick 先用真实输入事件转向，再推进一个 tick。
+ * 这样结果不受测试机器卡顿影响。method: 'keys' | 'wasd' | 'swipe' | 'dpad'。
+ */
+async function steerUntilScore(page, method, minScore, cdp, maxTicks = 600) {
+  const trace = [];
+  for (let i = 0; i < maxTicks; i++) {
+    const s = await getState(page);
+    if (s.status !== 'playing') {
+      throw new Error('蛇在测试操作中死亡：' + s.deathReason + '\n' + trace.slice(-6).join('\n'));
+    }
+    if (s.score > minScore) return s;
+    const want = planTowards(s, s.food);
+    const queuedLast = s.queue.length ? dirName(s.queue[s.queue.length - 1]) : dirName(s.dir);
+    trace.push(`t=${s.ticks} head=${JSON.stringify(s.snake[0])} dir=${dirName(s.dir)} food=${JSON.stringify(s.food)} want=${want}`);
+    if (want !== queuedLast) {
+      await sendInput(page, method, want, cdp);
+      const after = await getState(page);
+      const last = after.queue.length ? dirName(after.queue[after.queue.length - 1]) : dirName(after.dir);
+      if (last !== want) throw new Error(`输入没有生效（method=${method}, want=${want}）`);
+    }
+    await tick(page, 1);
+  }
+  throw new Error('在限定 tick 数内没有吃到食物（method=' + method + '）');
+}
+
+async function screenshot(page, name, opts) {
   fs.mkdirSync(SHOT_DIR, { recursive: true });
+  // 等浮层淡入动画结束再截图；游戏进行中截图时不能等（蛇会一直往前走）
+  if (!(opts && opts.instant)) await page.waitForTimeout(400);
   const file = path.join(SHOT_DIR, name + '.png');
   await page.screenshot({ path: file });
   return file;
@@ -128,6 +164,11 @@ module.exports = {
   dirName,
   planTowards,
   swipe,
+  tapDpad,
+  overlaps,
+  sendInput,
+  tick,
+  setManualClock,
   steerUntilScore,
   screenshot,
 };

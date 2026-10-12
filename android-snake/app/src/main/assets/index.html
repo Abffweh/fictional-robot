@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -8,47 +8,153 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="app">
+  <div id="app" data-screen="menu">
     <header id="hud">
-      <div class="hud-item"><span class="hud-label">得分</span><span id="hud-score" class="hud-value">0</span></div>
-      <div class="hud-item"><span class="hud-label">最高</span><span id="hud-best" class="hud-value">0</span></div>
-      <div class="hud-spacer"></div>
-      <button id="btn-pause" class="icon-btn" type="button" aria-label="暂停">❚❚</button>
+      <div class="hud-stats">
+        <div class="hud-item"><span class="hud-label">得分</span><span id="hud-score" class="hud-value">0</span></div>
+        <div class="hud-item"><span class="hud-label">最高</span><span id="hud-best" class="hud-value">0</span></div>
+        <div class="hud-item hud-mode"><span id="hud-mode" class="hud-label">经典</span><span id="hud-progress" class="hud-value small"></span></div>
+      </div>
+      <div id="hud-effects" aria-live="polite"></div>
+      <button id="btn-pause" class="icon-btn" type="button" aria-label="暂停">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>
+      </button>
     </header>
 
-    <main id="stage">
-      <canvas id="board" aria-label="游戏画面"></canvas>
-    </main>
+    <div id="play">
+      <main id="stage">
+        <canvas id="board" aria-label="游戏画面"></canvas>
+      </main>
+      <div id="dpad" aria-label="方向键">
+        <button class="dpad-btn up" type="button" data-dir="up" aria-label="上">▲</button>
+        <button class="dpad-btn left" type="button" data-dir="left" aria-label="左">◀</button>
+        <button class="dpad-btn right" type="button" data-dir="right" aria-label="右">▶</button>
+        <button class="dpad-btn down" type="button" data-dir="down" aria-label="下">▼</button>
+      </div>
+    </div>
 
-    <section id="screen-menu" class="overlay" data-screen="menu">
+    <!-- 主菜单 -->
+    <section class="overlay" data-screen="menu">
       <div class="panel">
         <h1 class="title">贪吃蛇</h1>
-        <label class="row"><span>穿墙</span><input id="opt-wrap" type="checkbox"></label>
-        <button id="btn-start" class="btn primary" type="button">开始游戏</button>
-        <p class="hint">方向键 / WASD / 滑动屏幕 控制，空格暂停</p>
+        <p class="subtitle">经典 · 闯关 · AI 演示</p>
+        <button class="btn primary" type="button" data-action="go-classic">经典模式</button>
+        <button class="btn" type="button" data-action="go-levels">闯关模式</button>
+        <button class="btn" type="button" data-action="start-demo">演示模式（AI 自动玩）</button>
+        <div class="btn-row">
+          <button class="btn" type="button" data-action="go-leaderboard">排行榜</button>
+          <button class="btn" type="button" data-action="go-settings">设置</button>
+        </div>
+        <p class="hint">方向键 / WASD / 滑动屏幕控制，空格暂停</p>
       </div>
     </section>
 
-    <section id="screen-pause" class="overlay hidden" data-screen="pause">
+    <!-- 经典模式选项 -->
+    <section class="overlay hidden" data-screen="classic">
+      <div class="panel">
+        <h2>经典模式</h2>
+        <label class="row switch-row"><span>穿墙（从一边出去，从另一边回来）</span><input id="opt-wrap" type="checkbox" class="switch"></label>
+        <div class="row"><span>速度</span>
+          <div class="segmented" id="opt-speed" role="group" aria-label="速度">
+            <button type="button" data-value="slow">慢</button>
+            <button type="button" data-value="normal">中</button>
+            <button type="button" data-value="fast">快</button>
+          </div>
+        </div>
+        <button id="btn-start" class="btn primary" type="button" data-action="start-classic">开始游戏</button>
+        <button class="btn" type="button" data-action="back">返回</button>
+      </div>
+    </section>
+
+    <!-- 关卡选择 -->
+    <section class="overlay hidden" data-screen="levels">
+      <div class="panel wide">
+        <h2>闯关模式</h2>
+        <p class="hint">蛇长达到目标长度即过关，过关后解锁下一关</p>
+        <div id="level-grid" class="level-grid"></div>
+        <button class="btn" type="button" data-action="back">返回</button>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="overlay hidden" data-screen="settings">
+      <div class="panel">
+        <h2>设置</h2>
+        <label class="row switch-row"><span>音效</span><input id="set-sound" type="checkbox" class="switch"></label>
+        <label class="row switch-row"><span>震动</span><input id="set-vibration" type="checkbox" class="switch"></label>
+        <label class="row switch-row"><span>屏幕方向键</span><input id="set-dpad" type="checkbox" class="switch"></label>
+        <div class="row"><span>主题</span>
+          <div class="segmented" id="set-theme" role="group" aria-label="主题">
+            <button type="button" data-value="system">跟随系统</button>
+            <button type="button" data-value="light">浅色</button>
+            <button type="button" data-value="dark">深色</button>
+          </div>
+        </div>
+        <button id="btn-clear" class="btn danger" type="button">清除所有记录</button>
+        <p id="storage-note" class="hint hidden">当前环境无法保存数据，记录只在本次运行中有效</p>
+        <button class="btn" type="button" data-action="back">返回</button>
+      </div>
+    </section>
+
+    <!-- 排行榜 -->
+    <section class="overlay hidden" data-screen="leaderboard">
+      <div class="panel wide">
+        <h2>排行榜</h2>
+        <div class="best-row">
+          <div class="best-card"><span>经典最高</span><b id="lb-best-classic">0</b></div>
+          <div class="best-card"><span>闯关最高</span><b id="lb-best-level">0</b></div>
+          <div class="best-card"><span>AI 演示最高</span><b id="lb-best-demo">0</b></div>
+        </div>
+        <div class="table-wrap">
+          <table class="board-table">
+            <thead><tr><th>名次</th><th>分数</th><th>模式</th><th>日期</th></tr></thead>
+            <tbody id="lb-body"></tbody>
+          </table>
+          <p id="lb-empty" class="hint">还没有成绩，快去玩一局吧</p>
+        </div>
+        <button class="btn" type="button" data-action="back">返回</button>
+      </div>
+    </section>
+
+    <!-- 暂停 -->
+    <section class="overlay hidden" data-screen="pause">
       <div class="panel">
         <h2>已暂停</h2>
-        <button id="btn-resume" class="btn primary" type="button">继续</button>
-        <button id="btn-pause-menu" class="btn" type="button">返回菜单</button>
+        <p class="hint">再按一次返回键退出游戏</p>
+        <button id="btn-resume" class="btn primary" type="button" data-action="resume">继续</button>
+        <button class="btn" type="button" data-action="restart">重新开始</button>
+        <button class="btn" type="button" data-action="menu">返回菜单</button>
       </div>
     </section>
 
-    <section id="screen-over" class="overlay hidden" data-screen="over">
+    <!-- 过关 -->
+    <section class="overlay hidden" data-screen="levelDone">
       <div class="panel">
-        <h2>游戏结束</h2>
+        <h2 id="ld-title">第 1 关完成！</h2>
+        <p class="big">得分 <b id="ld-score">0</b></p>
+        <p id="ld-next" class="hint"></p>
+        <button id="btn-next" class="btn primary" type="button" data-action="next-level">下一关</button>
+        <button class="btn" type="button" data-action="menu">返回菜单</button>
+      </div>
+    </section>
+
+    <!-- 结束 -->
+    <section class="overlay hidden" data-screen="over">
+      <div class="panel">
+        <h2 id="over-title">游戏结束</h2>
         <p class="big">得分 <b id="over-score">0</b></p>
-        <p>最高分 <b id="over-best">0</b></p>
-        <button id="btn-retry" class="btn primary" type="button">再来一局</button>
-        <button id="btn-over-menu" class="btn" type="button">返回菜单</button>
+        <p>最高分 <b id="over-best">0</b> <span id="over-new" class="badge hidden">新纪录！</span></p>
+        <p id="over-rank" class="hint"></p>
+        <button id="btn-retry" class="btn primary" type="button" data-action="restart">再来一局</button>
+        <button class="btn" type="button" data-action="menu">返回菜单</button>
       </div>
     </section>
   </div>
 
   <script src="js/core.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/render.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>
