@@ -100,6 +100,8 @@ def lint(subs, timed, a):
             cps = n / dur
             if cps > a.max_cps:
                 add('ERROR', i, f'每秒 {cps:.1f} 字，超过 {a.max_cps}；观众读不完，延长停留或删字')
+            elif cps > a.warn_cps:
+                add('WARN', i, f'每秒 {cps:.1f} 字，超过 {a.warn_cps}；读得完但记不住，重点句放慢')
             if dur < a.min_dur and n > 4:
                 add('WARN', i, f'只停留 {dur:.1f}s（< {a.min_dur}s）')
         # 4. 术语：第一次出现时提醒
@@ -127,8 +129,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('file')
     p.add_argument('--cps', type=float, default=4.5, help='无时间稿的估算语速（字/秒），默认 4.5')
-    p.add_argument('--max-cps', type=float, default=7.0, help='字幕阅读速度上限（字/秒），默认 7')
-    p.add_argument('--max-chars', type=int, default=20, help='单句字数上限，默认 20')
+    p.add_argument('--warn-cps', type=float, default=5.0, help='阅读速度提醒线（字/秒），默认 5；依据见 references/structure-by-duration.md 6.1')
+    p.add_argument('--max-cps', type=float, default=7.0, help='阅读速度上限（字/秒），默认 7；超过记 ERROR')
+    p.add_argument('--max-chars', type=int, default=20, help='单条字幕字数上限，默认 20（约两行，每行 ≤13 字时需要换行）')
     p.add_argument('--min-dur', type=float, default=1.2, help='单句最短停留（秒），默认 1.2')
     p.add_argument('--max-gap', type=float, default=3.0, help='两句间最长空档（秒），默认 3')
     p.add_argument('--first-line-by', type=float, default=1.0, help='第一句最晚出现时间（秒），默认 1')
