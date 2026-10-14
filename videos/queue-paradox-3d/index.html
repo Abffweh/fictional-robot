@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!--
+  《为什么旁边的队，总比你快？》· 系列「你的错觉，不是你的错」第 2 期 · 3D 黏土微缩风 · @Leo
+  - three.js（../friendship-paradox-3d/vendor/three.min.js，MIT）；window.render(t) 为纯时间函数，逐帧截图
+  - 无背景音乐：音效时间表见 window.SFX_CUES，由 sfx.py 合成
+  - 片中所有百分比、等待时间由页面代码现场模拟算出；与字幕不一致直接报错
+-->
+<title>为什么旁边的队总比你快 · 3D</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@500;700&family=EB+Garamond:ital,wght@0,500;0,700;1,500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #1a120c; }
+  #stage { position: relative; width: 1920px; height: 1080px; }
+  #gl { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  .ui { position: absolute; z-index: 20; font-family: 'Noto Serif SC', serif; color: #F3E8CF;
+        text-shadow: 0 2px 10px rgba(20,10,4,.85), 0 0 2px rgba(20,10,4,.9); }
+  #watermark { top: 1028px; left: 56px; font: 500 24px 'Noto Sans SC'; color: rgba(243,232,207,.55); }
+  #check { top: 74px; left: 70px; }
+  #check .head { font: 500 30px 'Noto Serif SC'; letter-spacing: 6px; }
+  #check .head i { font: italic 500 34px 'EB Garamond', serif; letter-spacing: 1px; margin-left: 10px; }
+  #check .row { display: flex; align-items: center; gap: 14px; margin-top: 14px; font: 700 40px 'Noto Serif SC'; position: relative; }
+  #check .box { width: 34px; height: 34px; border: 3px solid #F3E8CF; border-radius: 3px; position: relative; flex: none; }
+  #check .box.on::after { content: ''; position: absolute; left: 8px; top: -6px; width: 12px; height: 26px;
+        border: solid #E7C98B; border-width: 0 5px 5px 0; transform: rotate(40deg); }
+  #check .box.x { border-color: #D8584A; }
+  #check .box.x::before, #check .box.x::after { content: ''; position: absolute; left: 13px; top: -2px; width: 3px; height: 32px; background: #D8584A; }
+  #check .box.x::before { transform: rotate(45deg); } #check .box.x::after { transform: rotate(-45deg); }
+  #check .row.cur::before { content: '-'; position: absolute; margin-left: -26px; }
+  #corner { top: 150px; right: 80px; text-align: right; }
+  #corner .a { font: italic 500 58px 'EB Garamond', serif; }
+  #corner .a::after { content: ''; display: block; height: 3px; width: 140px; margin: 6px 0 0 auto; background: #C8463A; }
+  #corner .b { font: 500 34px 'Noto Serif SC'; letter-spacing: 4px; margin-top: 12px; }
+  #subtitle { left: 0; right: 0; top: 962px; text-align: center; font: 900 60px 'Noto Serif SC'; letter-spacing: 2px; }
+  #subtitle .ch { display: inline-block; }
+  #subtitle .em { color: #F0C987; }
+  #subtitle .red { color: #E8735F; text-decoration: underline; text-underline-offset: 10px; text-decoration-thickness: 3px; }
+  #labels { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+  .lab { position: absolute; font: 700 44px 'Noto Serif SC'; color: #F3E8CF; text-shadow: 0 2px 10px rgba(20,10,4,.9);
+         transform: translate(-50%, -100%); white-space: nowrap; margin-top: -30px; }
+  .lab::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: 30px; background: rgba(243,232,207,.75); }
+  .lab.small { font-size: 32px; }
+  .lab.gold { color: #F0C987; }
+  .lab.nol::after { display: none; } .lab.nol { margin-top: 0; }
+  #title { position: absolute; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+  #title .s { font: 500 30px 'Noto Serif SC'; letter-spacing: 12px; color: rgba(240,201,135,.9); }
+  #title .n { font: 900 100px 'Noto Serif SC'; color: #F0C987; letter-spacing: 4px; text-shadow: 0 6px 40px rgba(0,0,0,.6); }
+  #title .q { font: 500 40px 'Noto Serif SC'; color: #F3E8CF; }
+  #title .ch { display: inline-block; }
+  #title .refs { font: italic 500 30px 'EB Garamond', serif; color: rgba(243,232,207,.85); text-align: center; line-height: 1.7; margin-top: 18px; }
+  #title .note { font: 500 26px 'Noto Serif SC'; color: rgba(243,232,207,.6); margin-top: 18px; }
+  #hook { position: absolute; left: 0; right: 0; z-index: 25; text-align: center; font-family: 'Noto Serif SC', serif; color: #F6ECD6; pointer-events: none;
+           text-shadow: 0 3px 14px rgba(15,8,3,.95), 0 0 3px rgba(15,8,3,.95); }
+  #hook .t { display: inline-block; font-weight: 900; letter-spacing: 4px; }
+  #hook .hc { display: inline-block; }
+  #hook .g { color: #F0C987; } #hook .r { color: #EE7A62; }
+  #hook .u { height: 5px; margin: 10px auto 0; background: linear-gradient(90deg, rgba(240,201,135,0), #F0C987 20%, #F0C987 80%, rgba(240,201,135,0)); }
+  #hookbg { position: absolute; left: 0; right: 0; top: 0; height: 240px; z-index: 24; pointer-events: none;
+           background: linear-gradient(180deg, rgba(20,11,5,.62), rgba(20,11,5,0)); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl" width="1920" height="1080"></canvas>
+  <div id="labels"></div>
+  <div id="hookbg"></div>
+  <div id="hook"><div class="t"></div><div class="u"></div></div>
+  <div id="check" class="ui"></div>
+  <div id="corner" class="ui"><div class="a"></div><div class="b"></div></div>
+  <div id="subtitle" class="ui"></div>
+  <div id="watermark" class="ui">@Leo</div>
+  <div id="title"></div>
+</div>
+<script src="../friendship-paradox-3d/vendor/three.min.js"></script>
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const ease = t => t<.5 ? 2*t*t : 1-((-2*t+2)**2)/2;
+const easeOut = t => 1-(1-t)**3;
+const seg = (t,a,b) => clamp((t-a)/(b-a),0,1);
+function mulberry32(seed){ return function(){ let t = seed += 0x6D2B79F5;
+  t = Math.imul(t ^ t>>>15, t|1); t ^= t + Math.imul(t ^ t>>>7, t|61);
+  return ((t ^ t>>>14)>>>0)/4294967296; }; }
+const V3 = (x,y,z)=>new THREE.Vector3(x,y,z);
+const SERIF = "'Noto Serif SC', serif", SANS = "'Noto Sans SC', sans-serif", GAR = "'EB Garamond', serif";
+const COL = { cream:'#EFE4CF', olive:'#7D8A4E', moss:'#97A06A', brown:'#7A5235', rust:'#A9532E', you:'#D9772E',
+  mauve:'#8A5F6B', mustard:'#C9A248', sage:'#6F7D6A', clay:'#B98A64', wood:'#5A3A22', gold:'#E0B66A' };
+const PAWN_COLORS = [COL.olive, COL.brown, COL.mauve, COL.mustard, COL.sage, COL.rust, COL.moss, COL.clay];
+const hanLen = s => s.replace(/<[^>]+>/g,'').replace(/[A-Za-z0-9.%]+/g,'A').replace(/[\s，。、；：？！“”‘’「」《》（）—…,.;:?!"'()\-]/g,'').length;
+
+/* ================= 字幕（先定字幕，再按字幕排画面） ================= */
+const SUBS = [
+  [0.15, 3.3, '你去超市结账，前面的人开始<em>数零钱</em>；'],
+  [3.4, 6.5,  '堵车时你一变道，原来那条就<em>动了</em>；'],
+  [6.6, 9.7,  '食堂打饭，旁边窗口走得<em>飞快</em>。'],
+  [9.8, 13.8, '你是不是也觉得：自己总排在<em>最慢</em>的那一队？'],
+];
+const BODY = [   // [文本, 段首?]
+  ['先说排队。假设有<em>3条</em>一样长的队，', 1],
+  ['慢吞吞的顾客，随机出现在各队。'],
+  ['那你这队最快的机会，只有<red>三分之一</red>。'],
+  ['我们让电脑排了1000次，结果也是这样。'],
+  ['要是有4条队，就只剩<red>四分之一</red>。'],
+  ['所以别的队比你快，本来就是<em>常态</em>。'],
+  ['再说堵车。1999年，《自然》杂志有篇论文，', 1],
+  ['题目就叫《为什么旁边车道看起来更快》。'],
+  ['他们模拟了两条平均一样快的车道，'],
+  ['发现司机<em>被超车</em>的时间，比<em>超车</em>的时间长。'],
+  ['因为你慢的时候，要<em>慢很久</em>；'],
+  ['你快的时候，<em>一下</em>就开过去了。'],
+  ['被你超过的车跑到身后，你也<em>看不见</em>了。'],
+  ['可另一位学者博斯特罗姆说：旁边也许<em>真的</em>更快。', 1],
+  ['慢的路段车挤在一起，车<em>更多</em>；'],
+  ['随便挑一个司机，他多半就在<em>慢的那一边</em>。'],
+  ['就像上一期说的：你更容易数到<em>人缘好</em>的人；'],
+  ['这次是：你更容易待在<em>人多、慢</em>的地方。'],
+  ['那有什么用？换个排法：', 1],
+  ['大家排<em>一条长队</em>，哪个窗口空了谁上。'],
+  ['一个慢顾客只占住一个窗口，后面的人<em>照样走</em>。'],
+  ['银行叫号、机场安检，用的都是这个办法。'],
+  ['开车也一样：换来换去，多半<em>省不了几秒</em>。'],
+  ['所以，下次觉得旁边更快——', 1],
+  ['别急着换，这不全是你的<em>运气</em>问题。'],
+  ['排队时你会换队吗？<em>换，还是不换</em>？评论区告诉我。'],
+];
+{ let t = 16.7;
+  BODY.forEach(([txt, sec], i) => { if (i && sec) t += .3; const d = Math.max(2.4, hanLen(txt)/4.9 + .15);
+    SUBS.push([+t.toFixed(2), +(t+d).toFixed(2), txt]); t += d + .08; }); }
+const S_ = i => SUBS[i][0], E_ = i => SUBS[i][1];
+const END0 = E_(29) + .3, DURATION = +(END0 + 5.5).toFixed(2);
+
+/* ================= 渲染器 ================= */
+const W = 1920, H = 1080;
+const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('gl'), antialias: false, preserveDrawingBuffer: true});
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#2a1c12');
+scene.fog = new THREE.Fog('#2a1c12', 60, 160);
+const camera = new THREE.PerspectiveCamera(32, W/H, .1, 500);
+const hemi = new THREE.HemisphereLight('#ffe2bd', '#3b2414', .9); scene.add(hemi);
+const key = new THREE.DirectionalLight('#ffd6a0', 2.6);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 1; key.shadow.camera.far = 120; key.shadow.bias = -.0006; key.shadow.normalBias = .02; key.shadow.radius = 4;
+scene.add(key); scene.add(key.target);
+const fill = new THREE.DirectionalLight('#9fb4ff', .35); fill.position.set(-20, 12, -10); scene.add(fill);
+
+const rtA = new THREE.WebGLRenderTarget(W, H, {type: THREE.HalfFloatType, samples: 4}), rtB = new THREE.WebGLRenderTarget(W, H, {type: THREE.HalfFloatType}), rtC = new THREE.WebGLRenderTarget(W, H, {type: THREE.HalfFloatType});
+const postCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2,2)); const postScene = new THREE.Scene(); postScene.add(quad);
+const blurMat = new THREE.ShaderMaterial({
+  uniforms: {tex:{value:null}, dir:{value:new THREE.Vector2(1,0)}, focus:{value:.5}, band:{value:.16}, amount:{value:6}},
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy,0.,1.); }',
+  fragmentShader: `uniform sampler2D tex; uniform vec2 dir; uniform float focus, band, amount; varying vec2 vUv;
+    void main(){ float d = max(0., abs(vUv.y - focus) - band); float r = amount * smoothstep(0., .35, d);
+      vec2 px = dir / vec2(${W}., ${H}.) * r; vec4 c = vec4(0.); float ws = 0.;
+      for (int i=-6; i<=6; i++){ float w = exp(-float(i*i)/18.); c += texture2D(tex, vUv + px*float(i)) * w; ws += w; }
+      gl_FragColor = c / ws; }`, depthTest: false });
+const gradeMat = new THREE.ShaderMaterial({
+  uniforms: {tex:{value:null}, time:{value:0}, fade:{value:1}},
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy,0.,1.); }',
+  fragmentShader: `uniform sampler2D tex; uniform float time, fade; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + time*37.1) * 43758.5453); }
+    void main(){ vec3 c = texture2D(tex, vUv).rgb;
+      c = c / (c + vec3(.82)) * 1.82; c = pow(c, vec3(1./2.2));
+      c *= vec3(1.06, .99, .88); c = mix(vec3(dot(c, vec3(.299,.587,.114))), c, .88);
+      float v = smoothstep(1.15, .35, length((vUv-.5)*vec2(1.25,1.))); c *= mix(.45, 1., v);
+      c += (h(vUv*vec2(${W}.,${H}.)) - .5) * .045;
+      gl_FragColor = vec4(c * fade, 1.); }`, depthTest: false });
+renderer.toneMapping = THREE.NoToneMapping;
+function post(focus, band, amount, t, fade){
+  renderer.setRenderTarget(rtA); renderer.render(scene, camera);
+  quad.material = blurMat; blurMat.uniforms.focus.value = focus; blurMat.uniforms.band.value = band; blurMat.uniforms.amount.value = amount;
+  blurMat.uniforms.tex.value = rtA.texture; blurMat.uniforms.dir.value.set(1,0); renderer.setRenderTarget(rtB); renderer.render(postScene, postCam);
+  blurMat.uniforms.tex.value = rtB.texture; blurMat.uniforms.dir.value.set(0,1); renderer.setRenderTarget(rtC); renderer.render(postScene, postCam);
+  quad.material = gradeMat; gradeMat.uniforms.tex.value = rtC.texture; gradeMat.uniforms.time.value = t; gradeMat.uniforms.fade.value = fade;
+  renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+}
+
+/* ================= 材质与道具 ================= */
+const matCache = {};
+function clay(color, opts={}){
+  const k = color + JSON.stringify(opts);
+  if (!matCache[k]) matCache[k] = new THREE.MeshStandardMaterial({color, roughness: opts.r ?? .88, metalness: 0,
+    emissive: opts.emissive || '#000000', emissiveIntensity: opts.ei ?? 1, transparent: !!opts.transparent, opacity: opts.opacity ?? 1});
+  return matCache[k];
+}
+const TEXDRAW = [];
+function canvasTex(w, h, draw){
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const job = () => { const g = cv.getContext('2d'); g.clearRect(0,0,w,h); draw(g, w, h); tex.needsUpdate = true; };
+  job(); TEXDRAW.push(job); return tex;
+}
+function rr(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+const woodTex = canvasTex(1024, 1024, (g,w,h)=>{
+  g.fillStyle = '#5b3a23'; g.fillRect(0,0,w,h); const r = mulberry32(3);
+  for (let i=0;i<260;i++){ g.strokeStyle = `rgba(${30+r()*40|0},${18+r()*20|0},${8+r()*10|0},${.15+r()*.25})`; g.lineWidth = 1+r()*4;
+    g.beginPath(); const y = r()*h; g.moveTo(0,y); for (let x=0;x<=w;x+=64) g.lineTo(x, y+Math.sin(x*.01+i)*6); g.stroke(); }
+});
+woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping; woodTex.repeat.set(30, 8);
+function baseMat(color, noise=.35, rep=6){
+  const t = canvasTex(512, 512, (g,w,h)=>{ g.fillStyle = color; g.fillRect(0,0,w,h); const r = mulberry32(color.length*7 + color.charCodeAt(2));
+    for (let k=0;k<2200;k++){ g.fillStyle = `rgba(${r()<.5?'30,20,10':'255,240,210'},${r()*noise*.25})`; g.fillRect(r()*w, r()*h, 2+r()*3, 2+r()*3); } });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; const m = new THREE.MeshStandardMaterial({map: t, roughness: .95}); m.userData.rep = rep; return m;
+}
+function baseWith(w, d, topMat){
+  const g = new THREE.Group(); const side = clay('#5e4029');
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w,.5,d), [side, side, topMat, side, side, side]);
+  topMat.map.repeat.set(w/topMat.userData.rep, d/topMat.userData.rep); top.position.y = .25; top.receiveShadow = true; top.castShadow = true; g.add(top); return g;
+}
+const pawnBodyGeo = new THREE.LatheGeometry([[0,0],[.46,0],[.5,.08],[.44,.6],[.34,1.0],[.22,1.18],[0,1.2]].map(([x,y])=>new THREE.Vector2(x,y)), 28);
+const headGeo = new THREE.SphereGeometry(.36, 28, 20), eyeGeo = new THREE.SphereGeometry(.045, 10, 8);
+function pawn(color, o={}){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(pawnBodyGeo, clay(color)); body.castShadow = body.receiveShadow = true; g.add(body);
+  const head = new THREE.Mesh(headGeo, clay(COL.cream, {r:.7})); head.position.y = 1.5; head.castShadow = true; g.add(head);
+  for (const s of [-1,1]){ const e = new THREE.Mesh(eyeGeo, clay('#1b120c', {r:.3})); e.position.set(s*.12, 1.53, .33); g.add(e); }
+  if (o.scarf){ const sc = new THREE.Mesh(new THREE.TorusGeometry(.25,.09,10,24), clay(COL.mustard)); sc.rotation.x = Math.PI/2; sc.position.y = 1.18; sc.castShadow = true; g.add(sc); }
+  if (o.hat){ const hg = new THREE.Group(); const h1 = new THREE.Mesh(new THREE.CylinderGeometry(.3,.36,.18,20), clay(o.hat)); h1.position.y = 1.82; h1.castShadow = true; hg.add(h1);
+    const h2 = new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,.04,24), clay(o.hat)); h2.position.y = 1.74; hg.add(h2); g.add(hg); g.userData.hat = hg; }
+  g.userData.head = head; g.userData.s = o.s || 1; g.scale.setScalar(o.s || 1);
+  return g;
+}
+function face(o, x, z){ o.rotation.set(0, Math.atan2(x - o.position.x, z - o.position.z), 0); }
+function box(w,h,d,color,o={}){ const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), o.mat || clay(color,o)); m.castShadow = o.cast ?? true; m.receiveShadow = true; return m; }
+function cyl(rt,rb,h,color,o={}){ const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,o.seg||28), o.mat || clay(color,o)); m.castShadow = o.cast ?? true; m.receiveShadow = true; return m; }
+function sprite(tex, w, h){ const s = new THREE.Sprite(new THREE.SpriteMaterial({map: tex, transparent: true, depthWrite: false})); s.scale.set(w, h, 1); return s; }
+function bubbleTex(text, o={}){
+  return canvasTex(512, 256, (g,w,h)=>{
+    g.fillStyle = o.bg || '#F3E8CF'; rr(g, 16, 16, w-32, h-70, 60); g.fill();
+    g.beginPath(); g.moveTo(120, h-56); g.lineTo(90, h-8); g.lineTo(180, h-56); g.fill();
+    g.fillStyle = o.fg || '#3A2614'; g.font = `700 ${o.size||84}px ${SERIF}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, w/2, (h-54)/2+8);
+  });
+}
+function yarn(a, b, color='#B8463A', o={}){
+  const mid = a.clone().add(b).multiplyScalar(.5); mid.y -= o.sag ?? .25;
+  const geo = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 30, o.r || .05, 8, false);
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color, roughness: .9})); m.castShadow = true; return m;
+}
+/* 黏土小汽车（车头朝 +x） */
+const CAR = { body: new THREE.BoxGeometry(1.9, .55, 1.0), cabin: new THREE.BoxGeometry(1.0, .42, .86), wheel: new THREE.CylinderGeometry(.22, .22, .16, 16) };
+CAR.wheel.rotateX(Math.PI/2);
+const WHEEL_OFF = [[.6,.22,.5],[.6,.22,-.5],[-.6,.22,.5],[-.6,.22,-.5]];
+function car(color){
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(CAR.body, clay(color)); b.position.y = .5; b.castShadow = b.receiveShadow = true; g.add(b);
+  const c = new THREE.Mesh(CAR.cabin, clay('#d8cdb6')); c.position.set(-.15, .98, 0); c.castShadow = true; g.add(c);
+  for (const [x,y,z] of WHEEL_OFF){ const w = new THREE.Mesh(CAR.wheel, clay('#2a211b')); w.position.set(x,y,z); g.add(w); }
+  for (const z of [-.3,.3]){ const l = new THREE.Mesh(new THREE.SphereGeometry(.08,8,6), clay('#fff1c8',{emissive:'#ffdf9a', ei:1})); l.position.set(.96,.55,z); g.add(l); }
+  g.userData.body = b; return g;
+}
+
+/* ================= 世界 ================= */
+const table = new THREE.Mesh(new THREE.PlaneGeometry(1200, 500), new THREE.MeshStandardMaterial({map: woodTex, roughness: .75, color: '#8a6446'}));
+table.rotation.x = -Math.PI/2; table.position.x = 250; table.receiveShadow = true; scene.add(table);
+const SETS = {};
+const PERSON_IN_HOOK = [];   // 片尾冒"?"的人
+
+/* ---------- 模拟 1：排队（N 条队，每人前面 4 个顾客，慢顾客随机出现） ---------- */
+function mc(nl, runs, seed){
+  const r = mulberry32(seed), out = [], wins = Array(nl).fill(0), cum = [];
+  for (let k=0;k<runs;k++){
+    const slow = [], tot = [];
+    for (let l=0;l<nl;l++){ const s = []; let T = 0;
+      for (let i=0;i<4;i++){ const sl = r() < .25; s.push(sl); T += sl ? 3 + 2*r() : 1 + .5*r(); }
+      slow.push(s); tot.push(T); }
+    const win = tot.indexOf(Math.min(...tot)); wins[win]++; cum.push(wins.slice()); out.push({slow, tot, win});
+  }
+  return {runs: out, wins, cum, pct: wins[1]/runs*100};
+}
+const MC3 = mc(3, 1000, 2026), MC4 = mc(4, 1000, 4202);
+if (Math.abs(MC3.pct - 100/3) > 3 || Math.abs(MC4.pct - 25) > 3) throw new Error(`排队模拟与字幕不一致 ${MC3.pct} ${MC4.pct}`);
+
+/* ---------- 场景 A：超市收银台 ---------- */
+const LX = [-3, 0, 3, 6], QZ = i => -2.3 + i*1.45;
+SETS.market = (()=>{
+  const g = new THREE.Group();
+  const b = baseWith(14.5, 11.5, baseMat('#b9a27e', .4, 3)); b.position.set(1.0, 0, .3); g.add(b);
+  const Y = .5;
+  const back = box(14.5, 3.4, .3, '#c9b48e'); back.position.set(1.0, Y+1.7, -5.9); g.add(back);
+  const signTex = canvasTex(1024, 160, (c,w,h)=>{ c.fillStyle = '#B5352A'; rr(c,4,4,w-8,h-8,24); c.fill(); c.fillStyle = '#F6ECD6'; c.font = `900 96px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('收 银 台', w/2, h/2+6); });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, .94), new THREE.MeshStandardMaterial({map: signTex, roughness: .8})); sign.position.set(1.5, Y+2.7, -5.73); g.add(sign);
+  const lanes = LX.map((x, l) => {
+    const lg = new THREE.Group(); g.add(lg);
+    const counter = box(.9, .95, 2.6, '#8a6440'); counter.position.set(x+1.05, Y+.47, -2.7); lg.add(counter);
+    const belt = box(.7, .04, 2.4, '#2b2420', {cast:false}); belt.position.set(x+1.05, Y+.97, -2.6); lg.add(belt);
+    const reg = box(.5, .45, .5, '#d8cdb6'); reg.position.set(x+1.05, Y+1.2, -3.6); lg.add(reg);
+    const scr = box(.42, .3, .05, '#3c4a43', {emissive:'#7fb39a', ei:.35}); scr.position.set(x+1.05, Y+1.55, -3.4); lg.add(scr);
+    const cashier = pawn('#5d6f78', {s: .85}); cashier.position.set(x+1.9, Y, -3.3); face(cashier, x, -3.0); lg.add(cashier);
+    const num = canvasTex(160,160,(c,w,h)=>{ c.fillStyle = '#F1E6CF'; c.beginPath(); c.arc(80,80,74,0,7); c.fill(); c.fillStyle = '#3A2614'; c.font = `900 110px ${GAR}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(l+1), 80, 88); });
+    const pole = cyl(.04,.04,2.2,'#6b4a30'); pole.position.set(x+1.45, Y+1.1, -1.5); lg.add(pole);
+    const nm = new THREE.Mesh(new THREE.CircleGeometry(.4, 24), new THREE.MeshStandardMaterial({map: num, roughness:.8})); nm.position.set(x+1.45, Y+2.4, -1.45); lg.add(nm);
+    const strip = box(1.5, .03, 7.6, '#cdb994', {cast:false}); strip.material = strip.material.clone(); strip.position.set(x, Y+.015, 1.4); lg.add(strip);
+    const ppl = Array.from({length: 7}, (_, i) => {
+      const you = l === 1 && i === 4;
+      const p = pawn(you ? COL.you : PAWN_COLORS[(l*3 + i*5) % 8], {scarf: you, hat: you ? undefined : '#C8463A', s: .92});
+      const cart = new THREE.Group();
+      const basket = box(.62, .4, .5, '#9aa3a8'); basket.position.y = .75; cart.add(basket);
+      const goods = new THREE.Group(); [['#C8463A',-.15,.16],['#E0B66A',.12,.12],['#97A06A',0,-.1],['#9fc8ff',-.12,-.12],['#efe4cf',.15,-.05]].forEach(([c,x2,z2],k)=>{
+        const gd = box(.22, .3 + (k%2)*.15, .22, c); gd.position.set(x2, 1.05 + (k>2 ? .25 : 0), z2); goods.add(gd); });
+      cart.add(goods); cart.position.set(0, 0, -.62); p.add(cart);
+      p.userData.goods = goods; p.userData.you = you; p.rotation.y = Math.PI; lg.add(p);
+      if (i < 5) PERSON_IN_HOOK.push(p);
+      return p; });
+    return {lg, ppl, strip, x};
+  });
+  const coinTex = canvasTex(128,128,(c)=>{ c.fillStyle = '#E0B66A'; c.beginPath(); c.arc(64,64,56,0,7); c.fill(); c.strokeStyle = '#a07a2e'; c.lineWidth = 8; c.beginPath(); c.arc(64,64,44,0,7); c.stroke();
+    c.fillStyle = '#7a5a1e'; c.font = `900 64px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('¥', 64, 68); });
+  const coins = Array.from({length: 6}, () => { const s = sprite(coinTex, .45, .45); g.add(s); return s; });
+  const bubble = sprite(bubbleTex('一毛…两毛…', {size: 64}), 2.2, 1.1); g.add(bubble);
+  // 计数罐：每颗珠子 = 5 次"这一队最快"
+  const jars = LX.map((x, l) => { const jg = new THREE.Group(); jg.position.set(x, 0, 7.6); g.add(jg);
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, 2.6, 32, 1, true), new THREE.MeshStandardMaterial({color: '#dfe9ee', roughness: .1, transparent: true, opacity: .28, side: THREE.DoubleSide, depthWrite: false}));
+    glass.position.y = 1.3; jg.add(glass);
+    const bottom = cyl(.78, .78, .08, '#6b4a30'); bottom.position.y = .04; jg.add(bottom);
+    const beads = new THREE.InstancedMesh(new THREE.SphereGeometry(.15, 12, 8), new THREE.MeshStandardMaterial({color: l === 1 ? COL.you : '#9a9282', roughness: .7}), 120);
+    beads.castShadow = true; jg.add(beads); return {jg, beads}; });
+  const M = new THREE.Matrix4();
+  function beadPos(k){ const layer = Math.floor(k/9), j = k % 9; const a = j/9*Math.PI*2 + layer*.35, rad = j === 0 ? 0 : .48;
+    return [Math.cos(a)*(j===0?0:rad), .2 + layer*.24, Math.sin(a)*(j===0?0:rad)]; }
+  return {group: g, center: V3(1.5, 0, 1), lanes, jars, you: lanes[1].ppl[4],
+    update(t){
+      const hook = t < 13.8, sec1 = t >= S_(4) - .5 && t < S_(10);
+      // 每队前进量（只在开场）：旁边两队在走，你这队不动
+      const steps = hook || t >= S_(27) ? [[.5, 1.9], [], [1.0, 2.4]] : [[],[],[]];
+      const tl = t >= S_(27) ? 3.4 : t;
+      // 当前展示的模拟回合
+      let runIdx = -1, set4 = false;
+      if (t >= S_(5) && t < S_(7)) runIdx = Math.min(Math.floor((t - S_(5))/.8), 99);
+      if (t >= S_(7) && t < S_(8)) runIdx = Math.floor((S_(7) - S_(5))/.8) - 1;
+      if (t >= S_(8) + .8 && t < S_(10)){ set4 = true; runIdx = Math.floor((t - S_(8) - .8)/.8); }
+      const R = runIdx < 0 ? null : (set4 ? MC4 : MC3).runs[runIdx];
+      const winK = R ? seg((t - (set4 ? S_(8) + .8 : S_(5))) % .8, .35, .45) : 0;
+      lanes.forEach((L, l) => {
+        const show4 = l < 3 ? 1 : easeOut(seg(t, S_(8), S_(8) + .6)) * (sec1 ? 1 : 0);
+        L.lg.visible = show4 > .001; L.lg.scale.setScalar(Math.max(.001, show4));
+        L.lg.position.x = (1 - Math.max(.001, show4)) * L.x;
+        let A = 0; (steps[l] || []).forEach(s0 => A += ease(seg(tl, s0, s0 + .5)));
+        L.ppl.forEach((p, i) => {
+          const sl = i - A; let x = L.x, z = QZ(sl), sc = 1;
+          if (sl < 0){ x += -sl*1.6; z = QZ(0) - (-sl)*1.8; sc = 1 - seg(-sl, .5, 1); }
+          if (sl > 4.2) sc = hook || t >= S_(27) ? 1 - seg(sl, 4.2, 4.8) : 0;
+          if (!hook && t < S_(27) && i > 4) sc = 0;
+          p.position.set(x, .5, z); p.scale.setScalar(.92*Math.max(.001, sc)); p.visible = sc > .01;
+          const slow = R && i < 4 && R.slow[l] ? R.slow[l][i] : false;
+          const isSlowHook = (hook || t >= S_(27)) && l === 1 && i === 0;
+          if (p.userData.hat) p.userData.hat.visible = slow || isSlowHook;
+          p.userData.goods.visible = slow || isSlowHook || (!R && i % 2 === 0);
+          p.userData.goods.scale.setScalar(slow || isSlowHook ? 1.35 : .8);
+          p.position.y = .5 + (sec1 && R && i < 4 ? .12*Math.abs(Math.sin(t*6 + i + l)) * (slow ? 0 : 1) : 0);
+        });
+        const win = R && R.win === l;
+        L.strip.material.color.set(win ? '#E8B04A' : l === 1 && sec1 ? '#e2c9a0' : '#cdb994');
+        L.strip.material.emissive.set(win ? '#c98a2a' : '#000000'); L.strip.material.emissiveIntensity = win ? .6*winK : 0;
+      });
+      // 开场：数零钱
+      const cv = hook ? 1 : 0, front = lanes[1].ppl[0];
+      coins.forEach((s, k) => { const ph = ((t*1.3 + k/6) % 1); s.position.set(front.position.x + .55 + Math.sin(k*2)*.3, 1.3 + ph*1.4, front.position.z + .4); s.material.opacity = cv * Math.sin(ph*Math.PI); });
+      bubble.position.set(front.position.x + 1.5, 3.0, front.position.z); bubble.material.opacity = cv * seg(t, .6, .9);
+      // 计数罐（1000 次）
+      const k = Math.round(1000 * ease(seg(t, S_(7) + .3, E_(7) - .4)));
+      jars.forEach((J, l) => { const on = l < 3 && t >= S_(7) - .3 && t < S_(8) + .2; J.jg.visible = on; if (!on) return;
+        J.jg.scale.setScalar(Math.max(.001, easeOut(seg(t, S_(7) - .3, S_(7) + .2)) * (1 - ease(seg(t, S_(8) - .2, S_(8) + .2)))));
+        const n = k ? Math.floor(MC3.cum[k-1][l] / 5) : 0;
+        for (let q=0;q<120;q++){ const [x,y,z] = beadPos(q); M.makeTranslation(x, q < n ? y : -50, z); J.beads.setMatrixAt(q, M); }
+        J.beads.instanceMatrix.needsUpdate = true; });
+      this.k = k; this.R = R; this.set4 = set4; this.runIdx = runIdx;
+    }};
+})();
+
+/* ---------- 场景 B：开场堵车（你一变道，原来那条就动了） ---------- */
+SETS.road = (()=>{
+  const g = new THREE.Group(); g.position.set(20, 0, 0);
+  g.add(baseWith(17, 8.5, baseMat('#6f8a4c', .5)));
+  const road = box(17, .06, 5.4, '#4a4440', {cast:false}); road.position.y = .53; g.add(road);
+  for (let x=-8; x<8.5; x+=1.6){ const d = box(.8, .02, .12, '#efe4cf', {cast:false}); d.position.set(x, .57, 0); g.add(d); }
+  for (const z of [-2.65, 2.65]){ const e = box(17, .03, .1, '#efe4cf', {cast:false}); e.position.set(0, .57, z); g.add(e); }
+  const ZF = -1.3, ZN = 1.3;
+  const DF = u => { const a = 2.6*Math.min(u, 1.7); const d = clamp(u - 1.7, 0, .4); return Math.max(0,a) + 2.6*(d - d*d/(2*.4)); };
+  const DN = u => { const d = clamp(u - 2.0, 0, .4); return 2.6*(d*d/(2*.4)) + 2.6*Math.max(0, u - 2.4); };
+  const far = [0,1,2,4,5,6,7].map(j => { const c = car(PAWN_COLORS[(j*3)%8]); g.add(c); return {c, x0: -13.96 + 3.4*j}; });
+  const near = [-2,-1,1,2].map(j => { const c = car(PAWN_COLORS[(j*5+11)%8]); g.add(c); return {c, x0: 3.4*j}; });
+  const you = car(COL.you); g.add(you);
+  const place = (c, x, z) => { const vis = Math.abs(x) < 8.6; c.visible = vis; c.position.set(x, .53, z); c.scale.setScalar(1 - seg(Math.abs(x), 7.4, 8.6) + .001); };
+  return {group: g, center: V3(20, 0, 0), you,
+    update(t){
+      const u = t >= S_(27) ? 3.2 : clamp(t - 3.4, 0, 3.2);
+      far.forEach(({c, x0}) => place(c, x0 + DF(u), ZF));
+      near.forEach(({c, x0}) => place(c, x0 + DN(u), ZN));
+      const m = ease(seg(u, 1.0, 1.6));
+      const x = u < 1.6 ? .4*m : .4 + DF(u) - DF(1.6);
+      you.position.set(x, .53, lerp(ZN, ZF, m)); you.rotation.y = Math.sin(m*Math.PI) * .35;
+      [...far, ...near].forEach(({c}, i) => c.rotation.y = 0);
+    }};
+})();
+
+/* ---------- 场景 C：开场食堂（旁边窗口走得飞快） ---------- */
+SETS.canteen = (()=>{
+  const g = new THREE.Group(); g.position.set(40, 0, 0);
+  g.add(baseWith(16, 9, baseMat('#b08a64', .4, 3)));
+  const Y = .5;
+  const wall = box(16, 3.6, .4, '#d8c7a6'); wall.position.set(0, Y+1.8, -3.9); g.add(wall);
+  const QX = [-4.5, 0, 4.5];
+  QX.forEach((x, w) => {
+    const win = box(2.4, 1.2, .1, '#ffd99a', {emissive: '#ffcf80', ei: .5, cast:false}); win.position.set(x, Y+2.0, -3.66); g.add(win);
+    const shelf = box(2.8, .12, .7, '#8a6440'); shelf.position.set(x, Y+1.35, -3.4); g.add(shelf);
+    const tx = canvasTex(256, 110, (c,ww,h)=>{ c.fillStyle = '#3A2614'; rr(c,4,4,ww-8,h-8,16); c.fill(); c.fillStyle = '#F0C987'; c.font = `900 66px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(`${w+1}号窗`, ww/2, h/2+4); });
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(1.5, .64), new THREE.MeshStandardMaterial({map: tx})); sg.position.set(x, Y+3.1, -3.68); g.add(sg);
+  });
+  const lanes = QX.map((x, l) => Array.from({length: l === 1 ? 5 : 9}, (_, i) => {
+    const you = l === 1 && i === 3; const p = pawn(you ? COL.you : PAWN_COLORS[(l*4 + i*3) % 8], {scarf: you, s: .9});
+    p.rotation.y = Math.PI; g.add(p); if (i < 5) PERSON_IN_HOOK.push(p); return p; }));
+  const trayTex = canvasTex(128, 64, (c)=>{ c.fillStyle = '#c9b48e'; rr(c, 4, 10, 120, 44, 10); c.fill(); c.fillStyle = '#C8463A'; c.beginPath(); c.arc(40,32,14,0,7); c.fill(); c.fillStyle = '#97A06A'; c.beginPath(); c.arc(84,32,14,0,7); c.fill(); });
+  const trays = Array.from({length: 18}, () => { const s = sprite(trayTex, .9, .45); g.add(s); return s; });
+  const picky = sprite(bubbleTex('这个…还是那个…', {size: 56}), 2.4, 1.2); g.add(picky);
+  return {group: g, center: V3(40, 0, 0), you: lanes[1][3],
+    update(t){
+      const u = t >= S_(27) ? 3.2 : clamp(t - 6.6, 0, 3.2);
+      let ti = 0;
+      lanes.forEach((L, l) => { const A = l === 1 ? 0 : Math.floor(u/.7) + ease(seg(u % .7, 0, .45));
+        L.forEach((p, i) => { const sl = i - A; let x = QX[l], z = -2.6 + Math.max(0, sl)*1.3, sc = 1;
+          if (sl < 0){ x += (l === 0 ? -1 : 1) * (-sl)*2.2; z = -2.6 + (-sl)*1.2; sc = 1 - seg(-sl, .6, 1.2); }
+          if (sl > 4.3) sc = 1 - seg(sl, 4.3, 4.9);
+          p.position.set(x, Y, z); p.scale.setScalar(.9*Math.max(.001, sc)); p.visible = sc > .01;
+          if (l !== 1 && sl < 0 && ti < trays.length){ const s = trays[ti++]; s.position.set(x, 1.9, z + .3); s.material.opacity = sc; } });
+      });
+      for (; ti < trays.length; ti++) trays[ti].material.opacity = 0;
+      const f = lanes[1][0]; picky.position.set(f.position.x + 1.5, 3.0, f.position.z); picky.material.opacity = (t < 13.8 ? 1 : 0) * seg(u, .3, .6);
+    }};
+})();
+
+/* ---------- 模拟 2：两条车道（走走停停，平均一样快） ---------- */
+const HW = (()=>{
+  const V0 = 3.2, a = .5, lam = 26, h = 1.45, x0 = -120, dx = .02, N = 26000;
+  const vA = x => V0*(1 + a*Math.sin(2*Math.PI*x/lam)), vB = x => V0*(1 - a*Math.sin(2*Math.PI*x/lam));
+  const mk = v => { const T = new Float64Array(N); for (let i=1;i<N;i++){ const x = x0 + (i-.5)*dx; T[i] = T[i-1] + dx/v(x); } return T; };
+  const TA = mk(vA), TB = mk(vB);
+  const Tof = (T, x) => { const f = (x - x0)/dx, i = clamp(Math.floor(f), 0, N-2); return T[i] + (T[i+1]-T[i])*(f-i); };
+  const Xof = (T, tau) => { let lo = 0, hi = N-1; if (tau <= T[0]) return x0; if (tau >= T[N-1]) return x0 + (N-1)*dx;
+    while (hi - lo > 1){ const m = (lo+hi) >> 1; if (T[m] <= tau) lo = m; else hi = m; } return x0 + (lo + (tau - T[lo])/(T[hi]-T[lo]))*dx; };
+  const period = lam / (V0*Math.sqrt(1 - a*a));
+  return {V0, a, lam, h, vA, vB, TA, TB, Tof, Xof, period};
+})();
+/* 模拟时钟：段落内按固定倍速推进；"被超车"计时区间正好走完 3 个整周期 */
+const HWT = (()=>{
+  const r1 = 3*HW.period / (E_(16) - S_(13));
+  const segs = [[S_(10), 0], [S_(12), .6], [S_(13), r1], [E_(16) + .2, .15], [S_(26), 1.2], [END0 + 10, 1.2]];
+  const s = t => { let acc = 0; for (let i=0;i<segs.length-1;i++){ const [a, r] = segs[i], b = segs[i+1][0];
+      if (t <= a) return acc; acc += r * (Math.min(t, b) - a); if (t < b) return acc; } return acc; };
+  // 你的车：车道 A，k = 0；起点 x = 0
+  const tau0 = HW.Tof(HW.TA, 0);
+  const youX = t => HW.Xof(HW.TA, tau0 + s(t));
+  // "被超 / 超车" 计时：从 S13 起累计模拟时间
+  const sim0 = s(S_(13)), sim1 = s(E_(16)), stepN = 6000, cumP = new Float64Array(stepN+1), cumQ = new Float64Array(stepN+1), ds = (sim1 - sim0)/stepN;
+  for (let i=0;i<stepN;i++){ const x = HW.Xof(HW.TA, tau0 + sim0 + (i+.5)*ds); const passed = HW.vB(x) > HW.vA(x);
+    cumP[i+1] = cumP[i] + (passed ? ds : 0); cumQ[i+1] = cumQ[i] + (passed ? 0 : ds); }
+  const meter = t => { const f = clamp((s(t) - sim0)/ds, 0, stepN), i = Math.floor(f); return [cumP[i], cumQ[i]]; };
+  return {s, youX, meter, final: cumP[stepN]/(cumP[stepN]+cumQ[stepN])*100};
+})();
+if (HWT.final < 55) throw new Error('车道模拟：被超时间并不更长，与字幕不一致');
+
+/* ---------- 场景 D：公路（实例化车流 + 导航式路况色带） ---------- */
+SETS.hw = (()=>{
+  const g = new THREE.Group(); g.position.set(200, 0, 0);
+  const L0 = -40, L1 = 220, len = L1 - L0, cx = (L0 + L1)/2;
+  const grass = new THREE.Mesh(new THREE.BoxGeometry(len, .5, 14), [clay('#5e4029'),clay('#5e4029'),baseMat('#6f8a4c', .5),clay('#5e4029'),clay('#5e4029'),clay('#5e4029')]);
+  grass.material[2].map.repeat.set(len/6, 14/6); grass.position.set(cx, .25, 0); grass.receiveShadow = true; g.add(grass);
+  const road = box(len, .06, 6.2, '#4a4440', {cast:false}); road.position.set(cx, .53, 0); g.add(road);
+  const dash = new THREE.InstancedMesh(new THREE.BoxGeometry(.9, .02, .12), clay('#efe4cf'), Math.ceil(len/1.8)); const M = new THREE.Matrix4();
+  for (let i=0;i<dash.count;i++){ M.makeTranslation(L0 + i*1.8, .57, 0); dash.setMatrixAt(i, M); } g.add(dash);
+  // 路况色带：红 = 慢，绿 = 快（像导航软件）
+  const nS = Math.ceil(len/.6), strips = new THREE.InstancedMesh(new THREE.BoxGeometry(.6, .03, .32), new THREE.MeshStandardMaterial({color:'#ffffff', roughness:.8}), nS*2);
+  const red = new THREE.Color('#C8463A'), grn = new THREE.Color('#7FA65A'), tmp = new THREE.Color();
+  for (let i=0;i<nS;i++){ const x = L0 + (i+.5)*.6;
+    [[HW.vA(x), 2.85], [HW.vB(x), -2.85]].forEach(([v, z], k) => { M.makeTranslation(x, .58, z); strips.setMatrixAt(i*2+k, M);
+      strips.setColorAt(i*2+k, tmp.copy(red).lerp(grn, (v/HW.V0 - (1-HW.a)) / (2*HW.a))); }); }
+  g.add(strips);
+  // 路边广告牌：1999《自然》论文
+  const bbTex = canvasTex(1024, 640, (c,w,h)=>{ c.fillStyle = '#EFE5CF'; c.fillRect(0,0,w,h); const r = mulberry32(5);
+    for (let k=0;k<2000;k++){ c.fillStyle = `rgba(120,90,50,${r()*.08})`; c.fillRect(r()*w, r()*h, 2, 2); }
+    c.fillStyle = '#B5352A'; c.fillRect(0,0,w,110); c.fillStyle = '#F6ECD6'; c.font = `700 64px ${GAR}`; c.textAlign = 'center'; c.fillText('nature', w/2, 78);
+    c.fillStyle = '#5a4630'; c.font = `500 30px ${SANS}`; c.fillText('VOL 401 · 2 SEPTEMBER 1999 · P. 35', w/2, 170);
+    c.fillStyle = '#2e2114'; c.font = `italic 500 62px ${GAR}`; c.fillText('Why cars in the next lane', w/2, 290); c.fillText('seem to go faster', w/2, 370);
+    c.font = `500 32px ${SANS}`; c.fillText('DONALD A. REDELMEIER · ROBERT J. TIBSHIRANI', w/2, 460);
+    for (let i=0;i<3;i++){ c.fillStyle = 'rgba(70,50,30,.22)'; c.fillRect(120, 510 + i*30, 784 - r()*120, 10); }
+    c.fillStyle = 'rgba(90,70,50,.7)'; c.font = `500 26px ${SERIF}`; c.fillText('图为示意', w - 90, h - 26); });
+  const bb = new THREE.Group(); bb.position.set(-8, .5, -5.0);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(6.4, 4.0, .18), [clay('#6b4a30'),clay('#6b4a30'),clay('#6b4a30'),clay('#6b4a30'),new THREE.MeshStandardMaterial({map: bbTex, roughness:.9}),clay('#6b4a30')]);
+  board.position.y = 4.2; board.castShadow = true; bb.add(board);
+  for (const sx of [-2.2, 2.2]){ const leg = cyl(.12,.12,2.4,'#5a3a22'); leg.position.set(sx, 1.2, 0); bb.add(leg); }
+  bb.rotation.y = .25; g.add(bb);
+  // 车流：车道 A（你在这条，z = +1.5）、车道 B（z = -1.5）
+  const K = 70, NC = (2*K+1)*2;
+  const bodies = new THREE.InstancedMesh(CAR.body, new THREE.MeshStandardMaterial({color:'#ffffff', roughness:.85}), NC);
+  const cabins = new THREE.InstancedMesh(CAR.cabin, new THREE.MeshStandardMaterial({color:'#d8cdb6', roughness:.85}), NC);
+  const wheels = new THREE.InstancedMesh(CAR.wheel, new THREE.MeshStandardMaterial({color:'#2a211b', roughness:.9}), NC*4);
+  bodies.castShadow = cabins.castShadow = true; g.add(bodies); g.add(cabins); g.add(wheels);
+  const you = car(COL.you); g.add(you);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, .1, 10, 40), clay('#F0C987', {emissive:'#F0C987', ei: 1.2})); ring.rotation.x = Math.PI/2; g.add(ring);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 14, 32, 1, true), new THREE.MeshBasicMaterial({color:'#ffe2a8', transparent: true, opacity: .18, depthWrite: false, side: THREE.DoubleSide})); g.add(beam);
+  const tB0 = HW.Tof(HW.TB, 7);
+  const tA0 = HW.Tof(HW.TA, 0);
+  const cars = [];
+  for (let lane=0; lane<2; lane++) for (let k=-K; k<=K; k++) cars.push({lane, k, col: new THREE.Color(PAWN_COLORS[((k+K)*7 + lane*3) % 8])});
+  const gold = new THREE.Color('#E8B04A'), grey = new THREE.Color('#8C8576');
+  const Mb = new THREE.Matrix4(), Q = new THREE.Quaternion(), S1 = V3(1,1,1), Tv = V3(0,0,0);
+  const state = {pos: [], wx0: HWT.youX(S_(17)) - 6};
+  function placeCars(s, colorMode){
+    const pos = [];
+    cars.forEach((c, i) => {
+      let x = c.lane === 0 ? HW.Xof(HW.TA, tA0 + s + c.k*HW.h) : HW.Xof(HW.TB, tB0 + s + c.k*HW.h);
+      const z = c.lane === 0 ? 1.5 : -1.5, hide = (c.lane === 0 && c.k === 0) || x < L0 + 1 || x > L1 - 1;
+      Tv.set(x, hide ? -50 : .53, z); Mb.compose(Tv.clone().add(V3(0, .5, 0)), Q, S1); bodies.setMatrixAt(i, Mb);
+      Mb.compose(Tv.clone().add(V3(-.15, .98, 0)), Q, S1); cabins.setMatrixAt(i, Mb);
+      WHEEL_OFF.forEach(([wx,wy,wz], j) => { Mb.compose(Tv.clone().add(V3(wx, wy, wz)), Q, S1); wheels.setMatrixAt(i*4+j, Mb); });
+      const vOwn = c.lane === 0 ? HW.vA(x) : HW.vB(x), vOther = c.lane === 0 ? HW.vB(x) : HW.vA(x), slowSide = vOwn < vOther;
+      bodies.setColorAt(i, tmp.copy(c.col).lerp(slowSide ? gold : grey, colorMode));
+      if (!hide) pos.push({x, z, slowSide});
+    });
+    bodies.instanceMatrix.needsUpdate = cabins.instanceMatrix.needsUpdate = wheels.instanceMatrix.needsUpdate = true; bodies.instanceColor.needsUpdate = true;
+    return pos;
+  }
+  const pickR = mulberry32(2001);
+  const hops = Array.from({length: 7}, () => pickR());
+  return {group: g, center: V3(200, 0, 0), you, state,
+    update(t){
+      const s = HWT.s(t), yx = HWT.youX(t);
+      you.position.set(yx, .53, 1.5);
+      const sec3 = t >= S_(17) && t < S_(22);
+      const cm = sec3 ? ease(seg(t, S_(18), S_(18) + .8)) : 0;
+      const pos = placeCars(s, cm);
+      // 视野窗口（2 个波长）内：此刻处在慢的一边的司机比例
+      const wx0 = state.wx0, inWin = pos.filter(p => p.x >= wx0 && p.x < wx0 + 2*HW.lam);
+      inWin.push({x: yx, z: 1.5, slowSide: HW.vA(yx) < HW.vB(yx)});
+      state.frac = inWin.filter(p => p.slowSide).length / inWin.length * 100;
+      // 随机挑一个司机（聚光圈跳 7 次后停下）
+      const hk = Math.floor(seg(t, S_(19) + .2, S_(19) + 2.3) * 7);
+      const on = t >= S_(19) + .2 && t < S_(22);
+      if (on && inWin.length){ const pick = inWin[Math.floor(hops[Math.min(hk, 6)] * inWin.length)];
+        ring.position.set(pick.x, .7, pick.z); beam.position.set(pick.x, 7.5, pick.z); state.pick = pick; }
+      ring.visible = beam.visible = on;
+      state.done = t >= S_(19) + 2.3;
+    }};
+})();
+
+/* ---------- 模拟 3：两种排法（同一批顾客，单位：分钟） ---------- */
+const LANES_T = [[1.2, 1.0, 1.3], [6.0, 1.1, 1.2], [1.0, 1.4, 1.1]];
+const SNAKE = (()=>{
+  const left = LANES_T.map(L => { let T = 0; return L.map(d => { const s = T; T += d; return {s, e: T}; }); });
+  const youLeft = LANES_T[1].reduce((a, b) => a + b, 0);
+  const order = []; for (let i=0;i<3;i++) for (let l=0;l<3;l++) order.push({d: LANES_T[l][i], l, i});
+  const free = [0, 0, 0];
+  order.forEach(o => { const w = free.indexOf(Math.min(...free)); o.w = w; o.s = free[w]; o.e = o.s + o.d; free[w] = o.e; });
+  const yw = free.indexOf(Math.min(...free)), youRight = free[yw];
+  return {left, youLeft, order, youRight, yw};
+})();
+if (!(SNAKE.youRight < SNAKE.youLeft)) throw new Error('排法对比与字幕不一致');
+
+/* ---------- 场景 E：两种排法并排 ---------- */
+SETS.snake = (()=>{
+  const g = new THREE.Group(); g.position.set(300, 0, 0);
+  g.add(baseWith(21, 12, baseMat('#b9a27e', .4, 3)));
+  const divider = box(.2, .4, 12, '#6b4a30'); divider.position.set(0, .7, 0); g.add(divider);
+  const Y = .5, WX_L = [-8, -5, -2], WX_R = [2.5, 5.5, 8.5], WZ = -4.2;
+  const counters = [...WX_L, ...WX_R].map(x => { const c = box(1.8, .95, .7, '#8a6440'); c.position.set(x, Y+.47, -4.9); g.add(c);
+    const cs = pawn('#5d6f78', {s: .85}); cs.position.set(x, Y, -5.7); g.add(cs);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(.16, 12, 10), new THREE.MeshStandardMaterial({color: '#7FA65A', emissive: '#7FA65A', emissiveIntensity: .8})); lamp.position.set(x + .7, Y+1.2, -4.9); g.add(lamp);
+    return lamp; });
+  // 蛇形通道：立柱 + 红绳
+  const path = [[5.5, -2.6], [9.5, -2.6], [9.5, -1.0], [1.5, -1.0], [1.5, .6], [9.5, .6], [9.5, 2.2], [1.5, 2.2], [1.5, 3.8], [9.5, 3.8]];
+  const segL = []; let tot = 0; for (let i=0;i<path.length-1;i++){ const d = Math.hypot(path[i+1][0]-path[i][0], path[i+1][1]-path[i][1]); segL.push(d); tot += d; }
+  const along = q => { let d = q; for (let i=0;i<segL.length;i++){ if (d <= segL[i]) { const k = d/segL[i]; return [lerp(path[i][0], path[i+1][0], k), lerp(path[i][1], path[i+1][1], k)]; } d -= segL[i]; } return path[path.length-1]; };
+  [[-1.8, 2.4, 8.6], [-.2, 2.4, 8.6].map((v,i)=> i===0 ? v : v), [1.4, 2.4, 8.6], [3.0, 2.4, 8.6]].forEach(([z, xa, xb], r) => {
+    const x0 = r % 2 === 0 ? 1.0 : 2.4, x1 = r % 2 === 0 ? 8.6 : 10.0; const posts = [];
+    for (let x = x0; x <= x1 + .01; x += (x1 - x0)/4){ const p = cyl(.07, .07, 1.0, '#c9b48e'); p.position.set(x, Y+.5, z); g.add(p); const kb = new THREE.Mesh(new THREE.SphereGeometry(.1, 10, 8), clay('#E0B66A')); kb.position.set(x, Y+1.02, z); g.add(kb); posts.push(x); }
+    for (let i=0;i<posts.length-1;i++) g.add(yarn(V3(posts[i], Y+.95, z), V3(posts[i+1], Y+.95, z), '#B8463A', {sag: .18, r: .045}));
+  });
+  const mkP = (col, you, slow) => { const p = pawn(col, {scarf: you, hat: slow ? '#C8463A' : undefined, s: .85}); p.rotation.y = Math.PI; g.add(p); return p; };
+  const left = LANES_T.map((L, l) => L.map((d, i) => mkP(PAWN_COLORS[(l*3+i*2)%8], false, d > 3)));
+  const youL = mkP(COL.you, true, false);
+  const right = SNAKE.order.map(o => mkP(PAWN_COLORS[(o.l*3+o.i*2)%8], false, o.d > 3));
+  const youR = mkP(COL.you, true, false);
+  const MIN = .8;   // 1 分钟 = 0.8 秒
+  const tau = t => Math.max(0, (t - S_(23) - .3) / MIN);
+  return {group: g, center: V3(300, 0, 0), youL, youR, tau,
+    update(t){
+      const u = tau(t), eo = x => easeOut(clamp(x, 0, 1));
+      // 左：各排各的
+      left.forEach((L, l) => { L.forEach((p, i) => { const r = SNAKE.left[l][i];
+        let slot = i; for (let j=0;j<i;j++) slot -= eo((u - SNAKE.left[l][j].e)/.35);
+        let x = WX_L[l], z = WZ + 1.1 + slot*1.35, sc = 1;
+        const out = (u - r.e)/.5; if (out > 0){ x += eo(out)*1.6; z = WZ + 1.1 - eo(out)*.6; sc = 1 - clamp(out, 0, 1); }
+        p.position.set(x, Y, z); p.scale.setScalar(.85*Math.max(.001, sc)); p.visible = sc > .01; }); });
+      { let slot = 3; for (let j=0;j<3;j++) slot -= eo((u - SNAKE.left[1][j].e)/.35);
+        youL.position.set(WX_L[1], Y, WZ + 1.1 + slot*1.35); }
+      // 右：一条长队，哪个窗口空了谁上
+      const head = along(0);
+      right.forEach((p, q) => { const o = SNAKE.order[q];
+        let qi = q; for (let j=0;j<q;j++) qi -= eo((u - SNAKE.order[j].s)/.35);
+        let [x, z] = along(Math.max(0, qi)*1.25); let sc = 1;
+        const go = eo((u - o.s)/.4); if (u >= o.s){ x = lerp(head[0], WX_R[o.w], go); z = lerp(head[1], WZ + 1.1, go); }
+        const out = (u - o.e)/.5; if (out > 0){ x += eo(out)*1.6; z -= eo(out)*.6; sc = 1 - clamp(out, 0, 1); }
+        p.position.set(x, Y, z); p.scale.setScalar(.85*Math.max(.001, sc)); p.visible = sc > .01; });
+      { let qi = 9; for (let j=0;j<9;j++) qi -= eo((u - SNAKE.order[j].s)/.35);
+        let [x, z] = along(Math.max(0, qi)*1.25); const go = eo((u - SNAKE.youRight)/.4);
+        if (u >= SNAKE.youRight){ x = lerp(head[0], WX_R[SNAKE.yw], go); z = lerp(head[1], WZ + 1.1, go); }
+        youR.position.set(x, Y, z); }
+      // 窗口灯：忙 = 红，空 = 绿
+      const busyL = l => SNAKE.left[l].some(r => u >= r.s && u < r.e) || (l === 1 && u >= SNAKE.youLeft);
+      const busyR = w => SNAKE.order.some(o => o.w === w && u >= o.s && u < o.e) || (w === SNAKE.yw && u >= SNAKE.youRight);
+      counters.forEach((lamp, i) => { const b = i < 3 ? busyL(i) : busyR(i-3); lamp.material.color.set(b ? '#C8463A' : '#7FA65A'); lamp.material.emissive.set(b ? '#C8463A' : '#7FA65A'); });
+    }};
+})();
+
+/* 片尾："?" 冒在开场三个场景的人头上 */
+const THOUGHT = canvasTex(256, 256, (c)=>{ c.fillStyle = '#F1E6CF'; c.beginPath(); c.arc(128, 110, 92, 0, 7); c.fill();
+  c.beginPath(); c.arc(70, 210, 18, 0, 7); c.fill(); c.beginPath(); c.arc(44, 240, 10, 0, 7); c.fill();
+  c.fillStyle = '#3A2614'; c.font = `900 130px ${SERIF}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', 128, 118); });
+const THOUGHTS = PERSON_IN_HOOK.map(p => { const s = sprite(THOUGHT, 1.4, 1.4); s.position.set(.5, 2.7, 0); s.material.opacity = 0; p.add(s); return s; });
+{ const s = sprite(THOUGHT, 1.4, 1.4); s.position.set(0, 2.6, 0); s.material.opacity = 0; SETS.road.you.add(s); THOUGHTS.push(s); }
+Object.values(SETS).forEach(s => scene.add(s.group));
+
+/* ================= 镜头 ================= */
+const ALL3 = ['market','road','canteen'];
+const WIDE_P = V3(20.5, 33, 49), WIDE_L = V3(20.5, 0, -1);
+const carF = (dp, dl) => t => { const x = 200 + HWT.youX(t); return [V3(x, 0, 1.5).add(dp), V3(x, 0, 1.5).add(dl)]; };
+let SEC3X = 0;
+const SHOTS = [
+  {t0: 0,     t1: 3.4,  sets: ['market'], p: [V3(2.6, 3.4, 8.2), V3(3.4, 5.4, 11.5)], l: [V3(0, 1.4, -1.4), V3(.2, 1.2, -1.2)], out: true},
+  {t0: 3.4,   t1: 6.6,  sets: ['road'], p: [V3(14.5, 4.6, 7.8), V3(15.5, 5.2, 8.4)], l: [V3(21, .9, 0), V3(22.5, .9, -.4)]},
+  {t0: 6.6,   t1: 9.8,  sets: ['canteen'], p: [V3(46.5, 5.4, 9.5), V3(44.5, 5.0, 8.6)], l: [V3(40, 1.4, -1.2), V3(40, 1.4, -1.2)]},
+  {t0: 9.8,   t1: 13.8, sets: ALL3, p: [V3(40, 12, 22), WIDE_P], l: [V3(40, 1, 0), WIDE_L], wide: true},
+  {t0: 13.8,  t1: S_(4), sets: ALL3, p: [WIDE_P, V3(20.5, 26, 38)], l: [WIDE_L, WIDE_L], wide: true, blur: 16, band: 0, fade: .5},
+  {t0: S_(4), t1: S_(7), sets: ['market'], p: [V3(1.2, 14.5, 15.5), V3(1.0, 13, 13.2)], l: [V3(.8, 0, .2), V3(.8, .2, .4)], blur: 4, band: .24},
+  {t0: S_(7), t1: S_(8), sets: ['market'], p: [V3(.4, 6.5, 17.5), V3(.2, 6.0, 16.0)], l: [V3(0, 1.4, 6.0), V3(0, 1.4, 6.4)], blur: 5, band: .2},
+  {t0: S_(8), t1: S_(10), sets: ['market'], p: [V3(2.2, 15, 16), V3(2.0, 13.5, 14)], l: [V3(2.0, 0, .2), V3(2.0, .2, .4)], blur: 4, band: .24},
+  {t0: S_(10), t1: S_(12), sets: ['hw'], p: [V3(190, 4.6, 7.0), V3(190.8, 4.4, 5.6)], l: [V3(192, 3.8, -5), V3(192.2, 3.9, -5)], focus: .55, blur: 5, band: .2},
+  {t0: S_(12), t1: S_(14), sets: ['hw'], f: carF(V3(-10, 6, 7.5), V3(6, 0, -1))},
+  {t0: S_(14), t1: S_(16), sets: ['hw'], f: carF(V3(-4, 3.6, 8.5), V3(3, .5, -1)), blur: 5},
+  {t0: S_(16), t1: S_(17), sets: ['hw'], f: carF(V3(-6.5, 2.6, 1.0), V3(8, .9, -.3)), blur: 6, focus: .52},
+  {t0: S_(17), t1: S_(22), sets: ['hw'], sec3: true, wide: true},
+  {t0: S_(22), t1: S_(26), sets: ['snake'], p: [V3(300, 14.5, 13.5), V3(300, 13.2, 12)], l: [V3(300, 0, -2.4), V3(300, .2, -2.2)], blur: 4, band: .26},
+  {t0: S_(26), t1: S_(27), sets: ['hw'], f: carF(V3(-9, 5, 7), V3(6, 0, -1))},
+  {t0: S_(27), t1: S_(28) + .5, sets: ALL3, p: [V3(-1.5, 4.8, 9.5), WIDE_P], l: [V3(.2, 1.4, -.6), WIDE_L], wide: true},
+  {t0: S_(28) + .5, t1: END0, sets: ALL3, p: [WIDE_P, V3(20.5, 27, 40)], l: [WIDE_L, WIDE_L], wide: true},
+  {t0: END0, t1: DURATION + 1, sets: ALL3, p: [V3(20.5, 27, 40), V3(20.5, 25, 37)], l: [WIDE_L, WIDE_L], wide: true, blur: 16, band: 0, fade: .45},
+];
+function shotAt(t){ for (const s of SHOTS) if (t >= s.t0 && t < s.t1) return s; return SHOTS[SHOTS.length-1]; }
+
+/* ================= 叠加层 ================= */
+const TICKS = [[0.4, '前面的人数零钱'], [3.9, '一变道就堵'], [7.1, '旁边窗口飞快']];
+const CHECK = ['你的感受', '是真的吗', '为什么', '有什么用'], CHECK_T = [S_(4), S_(10), S_(22), S_(27)];
+const $ = id => document.getElementById(id);
+function spans(zh){ let out = '', cls = '';
+  for (const part of zh.split(/(<em>|<\/em>|<red>|<\/red>)/)){
+    if (part === '<em>'){ cls = 'em'; continue; } if (part === '<red>'){ cls = 'red'; continue; }
+    if (part === '</em>' || part === '</red>'){ cls = ''; continue; }
+    for (const ch of part) out += `<span class="ch ${cls}">${ch === ' ' ? '&nbsp;' : ch}</span>`; }
+  return out; }
+function corner(t){
+  const M = SETS.market, hw = SETS.hw.state;
+  if (t >= S_(5) && t < S_(7) && M.runIdx >= 0){ const R = M.R; return [`第 ${M.runIdx+1} 次`, R.win === 1 ? '你这队最快' : `${R.win+1} 号队最快`]; }
+  if (t >= S_(7) && t < S_(8)){ const k = Math.max(1, M.k); return [`${(MC3.cum[k-1][1]/k*100).toFixed(1)}%`, `排了 ${M.k} 次 · 你这队最快`]; }
+  if (t >= S_(8) && t < S_(10)) return [`${MC4.pct.toFixed(1)}%`, '4 条队 · 你这队最快'];
+  if (t >= S_(10) && t < S_(12)) return ['1999', '《自然》杂志的论文'];
+  if (t >= S_(13) && t < S_(17)){ const [p, q] = HWT.meter(t); const pc = p + q > .05 ? p/(p+q)*100 : 0;
+    return [`${pc.toFixed(0)}%`, `被超车 ${p.toFixed(1)} 秒 · 超车 ${q.toFixed(1)} 秒`]; }
+  if (t >= S_(17) && t < S_(18)) return ['2001', '博斯特罗姆的文章'];
+  if (t >= S_(18) + .6 && t < S_(22)) return [`${hw.frac.toFixed(0)}%`, '此刻在慢的一边的司机'];
+  return null;
+}
+let curSub = null, curCheck = null, curCorner = null, curTitle = null;
+function overlay(t){
+  const sub = SUBS.find(([a,b]) => t >= a && t < b), el = $('subtitle');
+  if (sub){ if (curSub !== sub){ el.innerHTML = spans(sub[2]); curSub = sub; }
+    el.style.opacity = 1 - ease(seg(t, sub[1]-.2, sub[1]));
+    el.querySelectorAll('.ch').forEach((s,i)=>{ const k = easeOut(seg(t, sub[0]+i*.025, sub[0]+i*.025+.22));
+      s.style.opacity = k; s.style.transform = `translateY(${(1-k)*16}px)`; });
+  } else { el.innerHTML = ''; curSub = null; }
+  let html = '';
+  if (t < 13.8){
+    const n = TICKS.filter(([s]) => t >= s).length;
+    if (n) html = `<div class="head">今日扎心 <i>×${n}</i></div>` + TICKS.slice(0,n).map(([,s],i)=>`<div class="row" style="opacity:${i===n-1?1:.55}"><div class="box x"></div>${s}</div>`).join('');
+  } else if (t >= CHECK_T[0] - .3 && t < S_(28) + 1.2){
+    const done = CHECK_T.filter(x => t >= x).length;
+    html = `<div class="head">看懂这件事 <i>${Math.min(done,4)}/4</i></div>` + CHECK.map((s,i)=>{
+      const st = i < done ? 'on' : '', cur = i === done ? 'cur' : '';
+      return `<div class="row ${cur}" style="opacity:${i <= done ? 1 : .5}"><div class="box ${st}"></div>${s}</div>`; }).join('');
+  }
+  if (html !== curCheck){ $('check').innerHTML = html; curCheck = html; }
+  $('check').style.opacity = t < 13.8 ? 1 - ease(seg(t, 13.2, 13.8)) : ease(seg(t, CHECK_T[0]-.3, CHECK_T[0]+.2)) * (1 - ease(seg(t, S_(28)+.7, S_(28)+1.2)));
+  const c = corner(t);
+  const a = c ? c[0] : '', b = c ? c[1] : '', key2 = a + '|' + b;
+  if (key2 !== curCorner){ $('corner').querySelector('.a').textContent = a; $('corner').querySelector('.b').textContent = b; curCorner = key2; }
+  $('corner').style.opacity = c ? 1 : 0;
+  const tt = $('title');
+  if (t >= 13.9 && t < S_(4)){
+    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, 13.9, 14.3)) * (1 - ease(seg(t, S_(4)-.4, S_(4))));
+    if (curTitle !== 'title'){ tt.innerHTML = `<div class="s">你的错觉，不是你的错 · 第 2 期</div><div class="n">${spans('《为什么旁边的队，总比你快？》')}</div><div class="q">其实，这不全怪你运气差</div>`; curTitle = 'title'; }
+    tt.querySelectorAll('.n .ch').forEach((s,i)=>{ const k = easeOut(seg(t, 14.0 + i*.04, 14.35 + i*.04)); s.style.opacity = k; s.style.transform = `translateY(${(1-k)*30}px)`; });
+    tt.querySelector('.q').style.opacity = ease(seg(t, 14.8, 15.3));
+  } else if (t >= END0){
+    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, END0, END0 + .6));
+    if (curTitle !== 'end'){ tt.innerHTML = `<div class="n" style="font-size:84px">@Leo 出品</div><div class="refs">
+      D. A. Redelmeier &amp; R. J. Tibshirani, "Why cars in the next lane seem to go faster," <i>Nature</i> 401, 35, 1999<br>
+      N. Bostrom, "Cars in the next lane really do go faster," <i>Plus Magazine</i>, 2001<br>
+      排队论：A. K. Erlang 的电话交换研究（1909 年起）</div>
+      <div class="note">本片场景与车流均为示意模拟 · 片中数字由程序实算 · 本片由 AI 生成</div>`; curTitle = 'end'; }
+  } else { tt.style.display = 'none'; }
+}
+const labEls = {};
+function label(id, worldPos, text, a, cls=''){
+  let e = labEls[id]; if (!e){ e = document.createElement('div'); $('labels').appendChild(e); labEls[id] = e; }
+  e.className = 'lab ' + cls;
+  if (a <= .01 || !worldPos){ e.style.opacity = 0; return; }
+  const p = worldPos.clone().project(camera);
+  if (e.textContent !== text) e.textContent = text; e.style.opacity = a;
+  e.style.left = ((p.x+1)/2*W) + 'px'; e.style.top = ((1-p.y)/2*H) + 'px';
+}
+const wp = (o, dy=0) => { const v = new THREE.Vector3(); o.getWorldPosition(v); v.y += dy; return v; };
+function labels(t, sh){
+  const L = [];
+  if (sh.sets.length === 1 && sh.sets[0] === 'market'){
+    L.push(['you', wp(SETS.market.you, 2.1), '你', t < 3.4 ? seg(t, 1.0, 1.4) : 1]);
+    if (t >= S_(7) && t < S_(8)) SETS.market.jars.slice(0, 3).forEach((J, l) => {
+      const k = SETS.market.k; L.push(['jar'+l, wp(J.jg, 0).add(V3(0, 1.0, .9)), `${k ? MC3.cum[k-1][l] : 0} 次`, seg(t, S_(7)+.2, S_(7)+.5), 'small nol' + (l === 1 ? ' gold' : '')]); });
+  }
+  if (sh.sets[0] === 'road') L.push(['you', wp(SETS.road.you, 1.6), '你', 1]);
+  if (sh.sets[0] === 'canteen') L.push(['you', wp(SETS.canteen.you, 2.0), '你', 1]);
+  if (sh.sets[0] === 'hw' && !sh.sec3 && t >= S_(12)) L.push(['you', wp(SETS.hw.you, 1.4), '你', 1]);
+  if (sh.sec3){ const st = SETS.hw.state;
+    if (st.done && st.pick) L.push(['pick', V3(200 + st.pick.x, 2.0, st.pick.z), st.pick.slowSide ? '他在慢的一边' : '他在快的一边', seg(t, S_(19)+2.3, S_(19)+2.6), 'small gold']);
+  }
+  if (sh.sets[0] === 'snake'){
+    const S = SETS.snake, u = S.tau(t);
+    L.push(['h1', V3(295, .6, 3.0), '各排各的', seg(t, S_(22)+.3, S_(22)+.7), 'nol']);
+    L.push(['h2', V3(305.5, .6, 3.0), '排一条长队', seg(t, S_(22)+.3, S_(22)+.7), 'nol gold']);
+    const w1 = Math.min(u, SNAKE.youLeft), w2 = Math.min(u, SNAKE.youRight);
+    L.push(['yl', wp(S.youL, 1.9), u >= SNAKE.youLeft ? `你等了 ${SNAKE.youLeft.toFixed(1)} 分钟` : `你：已等 ${w1.toFixed(1)} 分钟`, seg(t, S_(23), S_(23)+.4), 'small']);
+    L.push(['yr', wp(S.youR, 1.9).add(V3(-1.4, 0, 0)), u >= SNAKE.youRight ? `你等了 ${SNAKE.youRight.toFixed(1)} 分钟` : `你：已等 ${w2.toFixed(1)} 分钟`, seg(t, S_(23), S_(23)+.4), 'small gold']);
+  }
+  const used = new Set();
+  for (const [id, pos, text, a, cls] of L){ label(id, pos, text, a, cls); used.add(id); }
+  for (const id in labEls) if (!used.has(id)) labEls[id].style.opacity = 0;
+}
+/* 顶部大标题：逐字从模糊到清晰，全片常驻 */
+const HOOK_TXT = [['为什么',''],['旁边的队','g'],['，总比你',''],['快','g'],['？','r']];
+$('hook').querySelector('.t').innerHTML = HOOK_TXT.map(([s,c]) => [...s].map(ch => `<span class="hc ${c}">${ch}</span>`).join('')).join('');
+function hookUI(t){
+  const el = $('hook'), t1 = el.querySelector('.t'), u = el.querySelector('.u'), bg = $('hookbg');
+  const big = t < 13.9, hide = (t >= 13.9 && t < S_(4)) || t >= END0;
+  if (hide){ el.style.opacity = 0; bg.style.opacity = 0; return; }
+  const st = big ? .05 : S_(4);
+  el.querySelectorAll('.hc').forEach((c, i) => {
+    const k = easeOut(seg(t, st + i*.06, st + i*.06 + .5));
+    c.style.opacity = k; c.style.filter = `blur(${(1-k)*16}px)`; c.style.transform = `scale(${lerp(1.25, 1, k)})`;
+  });
+  if (big){
+    const out = ease(seg(t, 13.4, 13.9));
+    el.style.top = '56px'; t1.style.fontSize = '84px';
+    t1.style.transform = `scale(${1 + .025*Math.max(0, Math.sin(t*Math.PI/1.6))**8})`;
+    const ut = t < 6.5 ? t - .9 : t % 6.5; u.style.width = (620*easeOut(seg(ut, 0, 1.0))) + 'px'; u.style.opacity = (ut < 0 ? 0 : 1) * (1 - seg(ut, 5.6, 6.5));
+    el.style.opacity = 1 - out; bg.style.opacity = (1 - out) * ease(seg(t, 0, .4));
+  } else {
+    const k = ease(seg(t, S_(4), S_(4)+.6)) * (1 - ease(seg(t, END0-.5, END0)));
+    el.style.top = '34px'; t1.style.fontSize = '46px'; t1.style.transform = 'none';
+    u.style.width = '0px'; u.style.opacity = 0;
+    el.style.opacity = .92*k; bg.style.opacity = .55*k;
+  }
+}
+
+/* ================= 音效 ================= */
+const SFX = [
+  [0.0, 'crowd', .45], [0.0, 'beep', .5], [.45, 'beep', .45], [.8, 'coins', .7], [1.6, 'coins', .6], [2.4, 'coins', .6], [1.0, 'pop', .4], [.4, 'tick', .7],
+  [3.35, 'whoosh', .7], [3.4, 'engine', .6], [3.9, 'tick', .7], [4.4, 'whoosh', .4], [5.4, 'horn', .6], [5.0, 'engine', .5],
+  [6.55, 'whoosh', .7], [6.6, 'crowd', .4], [7.1, 'tick', .7], [7.0, 'clank', .5], [7.7, 'clank', .5], [8.4, 'clank', .5], [9.1, 'clank', .5],
+  [9.75, 'whoosh', .9], [10.6, 'riser', .5], [13.9, 'boom', .8],
+  [S_(4) - .1, 'whoosh', .7], [S_(4) + .2, 'crowd', .3],
+  ...Array.from({length: Math.floor((S_(7) - S_(5))/.8)}, (_, k) => [[S_(5) + k*.8, 'tick', .45], [S_(5) + k*.8 + .35, MC3.runs[k].win === 1 ? 'ding' : 'pop', .5]]).flat(),
+  [S_(7) - .1, 'whoosh', .6], [S_(7) + .3, 'fill', .6], [S_(7) + 1.2, 'fill', .5], [E_(7) - .4, 'shimmer', .6],
+  [S_(8), 'pop', .5], [S_(8) + .15, 'pop', .5], [S_(8) + .3, 'pop', .5],
+  ...Array.from({length: Math.floor((S_(10) - S_(8) - .8)/.8)}, (_, k) => [[S_(8) + .8 + k*.8, 'tick', .45], [S_(8) + .8 + k*.8 + .35, MC4.runs[k].win === 1 ? 'ding' : 'pop', .5]]).flat(),
+  [S_(10) - .1, 'whoosh', .7], [S_(10) + .3, 'paper', .6], [S_(11), 'stamp', .7],
+  ...Array.from({length: Math.ceil((E_(16) - S_(12))/1.4)}, (_, k) => [S_(12) + k*1.4, 'engine', .45]),
+  [S_(13), 'ding', .5],
+  [S_(17) - .1, 'whoosh', .7], [S_(18) + .1, 'shimmer', .6],
+  ...Array.from({length: 7}, (_, k) => [S_(19) + .2 + k*.3, 'tick', .6]), [S_(19) + 2.3, 'ding', .8],
+  [S_(22) - .1, 'whoosh', .7], [S_(22) + .2, 'crowd', .3],
+  ...SNAKE.order.map(o => [S_(23) + .3 + o.s*.8, 'beep', .35]),
+  ...SNAKE.left.flat().map(r => [S_(23) + .3 + r.s*.8, 'beep', .3]),
+  [S_(23) + .3 + SNAKE.youRight*.8, 'ding', .8], [S_(23) + .3 + SNAKE.youLeft*.8, 'buzzer', .5],
+  [S_(26) - .1, 'whoosh', .6], [S_(26) + .1, 'engine', .5], [S_(26) + 1.5, 'engine', .5],
+  [S_(27) - .1, 'whoosh', .8], ...Array.from({length: 6}, (_, k) => [S_(27) + 1.0 + k*.12, 'pop', .35]), [END0, 'boom', .6],
+].filter(c => c[0] < DURATION - .3);
+window.SFX_CUES = SFX.map(([t, k, v]) => [Math.round(Math.max(0, t)*1000)/1000, k, v]);
+
+/* ================= 帧入口 ================= */
+const MODE = /overlay/.test(location.search) ? 'overlay' : /base/.test(location.search) ? 'base' : 'full';
+window.render = function(t){
+  const sh = shotAt(t), raw = seg(t, sh.t0, sh.t1), k = sh.out ? easeOut(raw) : ease(raw);
+  for (const [name, set] of Object.entries(SETS)){ set.group.visible = sh.sets.includes(name); if (set.group.visible) set.update(t); }
+  let look;
+  if (sh.f){ const [p, l] = sh.f(t); camera.position.copy(p); look = l; }
+  else if (sh.sec3){ const cx = 200 + SETS.hw.state.wx0 + HW.lam; SEC3X = cx;
+    camera.position.set(cx, lerp(46, 40, ease(raw)), lerp(36, 31, ease(raw))); look = V3(cx, 0, -1); }
+  else { camera.position.lerpVectors(sh.p[0], sh.p[1], k); look = new THREE.Vector3().lerpVectors(sh.l[0], sh.l[1], k); }
+  const settle = 1 - easeOut(seg(t, sh.t0, sh.t0 + .5));
+  camera.position.add(V3(Math.sin(t*.7)*.05, Math.cos(t*.53)*.04, 0)).lerp(look, -.05*settle);
+  camera.lookAt(look);
+  THOUGHTS.forEach((s,i)=>{ const kk = easeOut(seg(t, S_(27) + 1.0 + (i%12)*.08, S_(27) + 1.3 + (i%12)*.08)); s.material.opacity = t >= S_(27) ? kk : 0; s.scale.setScalar(1.4*Math.max(.001, kk)); });
+  const c = sh.sets === ALL3 ? V3(20.5, 0, 0) : sh.sets[0] === 'hw' ? look.clone().setY(0) : SETS[sh.sets[0]].center;
+  const sz = sh.wide ? 50 : 18;
+  key.position.set(c.x + 9, 30, c.z + 14); key.target.position.copy(c);
+  if (key.shadow.camera.right !== sz){ key.shadow.camera.left = -sz; key.shadow.camera.right = sz; key.shadow.camera.top = sz; key.shadow.camera.bottom = -sz; key.shadow.camera.updateProjectionMatrix(); }
+  camera.updateMatrixWorld();
+  if (MODE !== 'overlay') post(sh.focus ?? .5, sh.band ?? (sh.wide ? .12 : .14), sh.blur ?? (sh.wide ? 8 : 7), t, sh.fade ?? 1);
+  if (MODE !== 'base'){ labels(t, sh); overlay(t); hookUI(t); }
+};
+window.setup = function(done){
+  const text = document.documentElement.innerHTML + SUBS.map(s=>s[2]).join('') + '你的错觉，不是你的错第期其实这不全怪你运气差出品本片场景与车流均为示意模拟片中数字由程序实算由生成排队论的电话交换研究年起一毛两毛这个还是那个号窗收银台各排各的排一条长队你等了已等分钟他在慢快的一边此刻司机同一批顾客两种排法被超车秒次最快条队杂志论文博斯特罗姆文章今日扎心前面人数零钱变道就堵旁边窗口飞看懂这件事感受是真吗为什么有用图为示意';
+  const faces = ['500 20px "Noto Serif SC"','700 20px "Noto Serif SC"','900 20px "Noto Serif SC"','500 20px "Noto Sans SC"','700 20px "Noto Sans SC"','italic 500 20px "EB Garamond"','500 20px "EB Garamond"','700 20px "EB Garamond"'];
+  Promise.all(faces.map(f => document.fonts.load(f, text).catch(()=>null))).then(() => document.fonts.ready).then(() => {
+    TEXDRAW.forEach(j => j()); done && done(); });
+};
+window.DURATION = DURATION;
+window.SUBS = SUBS;
+window.STATS = {mc3: MC3.pct, mc4: MC4.pct, hwFinal: HWT.final, youLeft: SNAKE.youLeft, youRight: SNAKE.youRight, period: HW.period};
+if (MODE === 'overlay'){
+  document.body.style.background = 'transparent'; document.documentElement.style.background = 'transparent'; $('stage').style.background = 'transparent';
+  $('gl').style.display = 'none';
+}
+if (MODE === 'base') for (const id of ['labels','check','corner','subtitle','watermark','title','hook','hookbg']) $(id).style.display = 'none';
+let t0 = performance.now();
+(function loop(){ if (window.__RENDER_MODE__) return; window.render(((performance.now()-t0)/1000) % DURATION); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
