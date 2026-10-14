@@ -4,7 +4,7 @@
 import argparse, asyncio, os
 async def main():
     ap = argparse.ArgumentParser(); ap.add_argument("html"); ap.add_argument("out")
-    ap.add_argument("--fps", type=int, default=24); ap.add_argument("--times", default="")
+    ap.add_argument("--fps", type=int, default=24); ap.add_argument("--times", default=""); ap.add_argument("--end", type=int, default=-1)
     a = ap.parse_args(); os.makedirs(a.out, exist_ok=True)
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
@@ -13,7 +13,7 @@ async def main():
         await pg.goto("file://" + os.path.abspath(a.html) + "?overlay")
         await pg.evaluate("new Promise(r => window.setup(r))"); await pg.evaluate("window.__RENDER_MODE__ = true")
         dur = await pg.evaluate("window.DURATION")
-        frames = [round(float(x)*a.fps) for x in a.times.split(",")] if a.times else range(int(round(dur*a.fps)))
+        frames = [round(float(x)*a.fps) for x in a.times.split(",")] if a.times else range(int(round(dur*a.fps)) if a.end < 0 else a.end)
         for fi in frames:
             await pg.evaluate(f"window.render({fi/a.fps})")
             await pg.screenshot(path=os.path.join(a.out, f"h{fi:06d}.png"), omit_background=True, timeout=180000)

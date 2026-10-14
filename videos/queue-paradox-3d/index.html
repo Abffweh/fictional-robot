@@ -43,6 +43,7 @@
   .lab::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: 30px; background: rgba(243,232,207,.75); }
   .lab.small { font-size: 32px; }
   .lab.gold { color: #F0C987; }
+  .lab.red { color: #EE7A62; }
   .lab.nol::after { display: none; } .lab.nol { margin-top: 0; }
   #title { position: absolute; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
   #title .s { font: 500 30px 'Noto Serif SC'; letter-spacing: 12px; color: rgba(240,201,135,.9); }
@@ -94,11 +95,13 @@ const hanLen = s => s.replace(/<[^>]+>/g,'').replace(/[A-Za-z0-9.%]+/g,'A').repl
 
 /* ================= 字幕（先定字幕，再按字幕排画面） ================= */
 const SUBS = [
-  [0.15, 3.3, '你去超市结账，前面的人开始<em>数零钱</em>；'],
+  [0.15, 3.3, '超市结账，你排的这列总比<em>旁边慢</em>；'],
   [3.4, 6.5,  '堵车时你一变道，原来那条就<em>动了</em>；'],
   [6.6, 9.7,  '食堂打饭，旁边窗口走得<em>飞快</em>。'],
-  [9.8, 13.8, '你是不是也觉得：自己总排在<em>最慢</em>的那一队？'],
+  [9.8, 13.6, '你是不是也觉得：自己总排在<em>最慢</em>的那一队？'],
 ];
+const HE = 17.55;   // 开场结束、标题卡开始
+const MURPHY = [13.7, 17.45, '这甚至被写进了墨菲定律：<em>别的队，总是更快</em>。'];
 const BODY = [   // [文本, 段首?]
   ['先说排队。假设有<em>3条</em>一样长的队，', 1],
   ['慢吞吞的顾客，随机出现在各队。'],
@@ -127,10 +130,11 @@ const BODY = [   // [文本, 段首?]
   ['别急着换，这不全是你的<em>运气</em>问题。'],
   ['排队时你会换队吗？<em>换，还是不换</em>？评论区告诉我。'],
 ];
-{ let t = 16.7;
+{ let t = HE + 2.9;
   BODY.forEach(([txt, sec], i) => { if (i && sec) t += .3; const d = Math.max(2.4, hanLen(txt)/4.9 + .15);
     SUBS.push([+t.toFixed(2), +(t+d).toFixed(2), txt]); t += d + .08; }); }
 const S_ = i => SUBS[i][0], E_ = i => SUBS[i][1];
+const ALLSUBS = [...SUBS.slice(0, 4), MURPHY, ...SUBS.slice(4)];
 const END0 = E_(29) + .3, DURATION = +(END0 + 5.5).toFixed(2);
 
 /* ================= 渲染器 ================= */
@@ -327,7 +331,7 @@ SETS.market = (()=>{
     return [Math.cos(a)*(j===0?0:rad), .2 + layer*.24, Math.sin(a)*(j===0?0:rad)]; }
   return {group: g, center: V3(1.5, 0, 1), lanes, jars, you: lanes[1].ppl[4],
     update(t){
-      const hook = t < 13.8, sec1 = t >= S_(4) - .5 && t < S_(10);
+      const hook = t < HE, sec1 = t >= S_(4) - .5 && t < S_(10);
       // 每队前进量（只在开场）：旁边两队在走，你这队不动
       const steps = hook || t >= S_(27) ? [[.5, 1.9], [], [1.0, 2.4]] : [[],[],[]];
       const tl = t >= S_(27) ? 3.4 : t;
@@ -363,7 +367,7 @@ SETS.market = (()=>{
       // 开场：数零钱
       const cv = hook ? 1 : 0, front = lanes[1].ppl[0];
       coins.forEach((s, k) => { const ph = ((t*1.3 + k/6) % 1); s.position.set(front.position.x + .55 + Math.sin(k*2)*.3, 1.3 + ph*1.4, front.position.z + .4); s.material.opacity = cv * Math.sin(ph*Math.PI); });
-      bubble.position.set(front.position.x + 1.5, 3.0, front.position.z); bubble.material.opacity = cv * seg(t, .6, .9);
+      bubble.position.set(front.position.x + 1.5, 3.0, front.position.z); bubble.material.opacity = 0;
       // 计数罐（1000 次）
       const k = Math.round(1000 * ease(seg(t, S_(7) + .3, E_(7) - .4)));
       jars.forEach((J, l) => { const on = l < 3 && t >= S_(7) - .3 && t < S_(8) + .2; J.jg.visible = on; if (!on) return;
@@ -432,7 +436,7 @@ SETS.canteen = (()=>{
           if (l !== 1 && sl < 0 && ti < trays.length){ const s = trays[ti++]; s.position.set(x, 1.9, z + .3); s.material.opacity = sc; } });
       });
       for (; ti < trays.length; ti++) trays[ti].material.opacity = 0;
-      const f = lanes[1][0]; picky.position.set(f.position.x + 1.5, 3.0, f.position.z); picky.material.opacity = (t < 13.8 ? 1 : 0) * seg(u, .3, .6);
+      const f = lanes[1][0]; picky.position.set(f.position.x + 1.5, 3.0, f.position.z); picky.material.opacity = 0;
     }};
 })();
 
@@ -636,8 +640,8 @@ const SHOTS = [
   {t0: 0,     t1: 3.4,  sets: ['market'], p: [V3(2.6, 3.4, 8.2), V3(3.4, 5.4, 11.5)], l: [V3(0, 1.4, -1.4), V3(.2, 1.2, -1.2)], out: true},
   {t0: 3.4,   t1: 6.6,  sets: ['road'], p: [V3(14.5, 4.6, 7.8), V3(15.5, 5.2, 8.4)], l: [V3(21, .9, 0), V3(22.5, .9, -.4)]},
   {t0: 6.6,   t1: 9.8,  sets: ['canteen'], p: [V3(46.5, 5.4, 9.5), V3(44.5, 5.0, 8.6)], l: [V3(40, 1.4, -1.2), V3(40, 1.4, -1.2)]},
-  {t0: 9.8,   t1: 13.8, sets: ALL3, p: [V3(40, 12, 22), WIDE_P], l: [V3(40, 1, 0), WIDE_L], wide: true},
-  {t0: 13.8,  t1: S_(4), sets: ALL3, p: [WIDE_P, V3(20.5, 26, 38)], l: [WIDE_L, WIDE_L], wide: true, blur: 16, band: 0, fade: .5},
+  {t0: 9.8,   t1: HE, sets: ALL3, p: [V3(40, 12, 22), WIDE_P], l: [V3(40, 1, 0), WIDE_L], wide: true},
+  {t0: HE,  t1: S_(4), sets: ALL3, p: [WIDE_P, V3(20.5, 26, 38)], l: [WIDE_L, WIDE_L], wide: true, blur: 16, band: 0, fade: .5},
   {t0: S_(4), t1: S_(7), sets: ['market'], p: [V3(1.2, 14.5, 15.5), V3(1.0, 13, 13.2)], l: [V3(.8, 0, .2), V3(.8, .2, .4)], blur: 4, band: .24},
   {t0: S_(7), t1: S_(8), sets: ['market'], p: [V3(.4, 6.5, 17.5), V3(.2, 6.0, 16.0)], l: [V3(0, 1.4, 6.0), V3(0, 1.4, 6.4)], blur: 5, band: .2},
   {t0: S_(8), t1: S_(10), sets: ['market'], p: [V3(2.2, 15, 16), V3(2.0, 13.5, 14)], l: [V3(2.0, 0, .2), V3(2.0, .2, .4)], blur: 4, band: .24},
@@ -655,7 +659,7 @@ const SHOTS = [
 function shotAt(t){ for (const s of SHOTS) if (t >= s.t0 && t < s.t1) return s; return SHOTS[SHOTS.length-1]; }
 
 /* ================= 叠加层 ================= */
-const TICKS = [[0.4, '前面的人数零钱'], [3.9, '一变道就堵'], [7.1, '旁边窗口飞快']];
+const TICKS = [[0.4, '我这列不动'], [3.9, '一变道就堵'], [7.1, '旁边窗口飞快']];
 const CHECK = ['你的感受', '是真的吗', '为什么', '有什么用'], CHECK_T = [S_(4), S_(10), S_(22), S_(27)];
 const $ = id => document.getElementById(id);
 function spans(zh){ let out = '', cls = '';
@@ -666,6 +670,7 @@ function spans(zh){ let out = '', cls = '';
   return out; }
 function corner(t){
   const M = SETS.market, hw = SETS.hw.state;
+  if (t >= MURPHY[0] && t < MURPHY[1]) return ["Murphy's Law", '墨菲定律 · 排队篇'];
   if (t >= S_(5) && t < S_(7) && M.runIdx >= 0){ const R = M.R; return [`第 ${M.runIdx+1} 次`, R.win === 1 ? '你这队最快' : `${R.win+1} 号队最快`]; }
   if (t >= S_(7) && t < S_(8)){ const k = Math.max(1, M.k); return [`${(MC3.cum[k-1][1]/k*100).toFixed(1)}%`, `排了 ${M.k} 次 · 你这队最快`]; }
   if (t >= S_(8) && t < S_(10)) return [`${MC4.pct.toFixed(1)}%`, '4 条队 · 你这队最快'];
@@ -678,14 +683,14 @@ function corner(t){
 }
 let curSub = null, curCheck = null, curCorner = null, curTitle = null;
 function overlay(t){
-  const sub = SUBS.find(([a,b]) => t >= a && t < b), el = $('subtitle');
+  const sub = ALLSUBS.find(([a,b]) => t >= a && t < b), el = $('subtitle');
   if (sub){ if (curSub !== sub){ el.innerHTML = spans(sub[2]); curSub = sub; }
     el.style.opacity = 1 - ease(seg(t, sub[1]-.2, sub[1]));
     el.querySelectorAll('.ch').forEach((s,i)=>{ const k = easeOut(seg(t, sub[0]+i*.025, sub[0]+i*.025+.22));
       s.style.opacity = k; s.style.transform = `translateY(${(1-k)*16}px)`; });
   } else { el.innerHTML = ''; curSub = null; }
   let html = '';
-  if (t < 13.8){
+  if (t < HE){
     const n = TICKS.filter(([s]) => t >= s).length;
     if (n) html = `<div class="head">今日扎心 <i>×${n}</i></div>` + TICKS.slice(0,n).map(([,s],i)=>`<div class="row" style="opacity:${i===n-1?1:.55}"><div class="box x"></div>${s}</div>`).join('');
   } else if (t >= CHECK_T[0] - .3 && t < S_(28) + 1.2){
@@ -695,17 +700,17 @@ function overlay(t){
       return `<div class="row ${cur}" style="opacity:${i <= done ? 1 : .5}"><div class="box ${st}"></div>${s}</div>`; }).join('');
   }
   if (html !== curCheck){ $('check').innerHTML = html; curCheck = html; }
-  $('check').style.opacity = t < 13.8 ? 1 - ease(seg(t, 13.2, 13.8)) : ease(seg(t, CHECK_T[0]-.3, CHECK_T[0]+.2)) * (1 - ease(seg(t, S_(28)+.7, S_(28)+1.2)));
+  $('check').style.opacity = t < HE ? 1 - ease(seg(t, HE-.6, HE)) : ease(seg(t, CHECK_T[0]-.3, CHECK_T[0]+.2)) * (1 - ease(seg(t, S_(28)+.7, S_(28)+1.2)));
   const c = corner(t);
   const a = c ? c[0] : '', b = c ? c[1] : '', key2 = a + '|' + b;
   if (key2 !== curCorner){ $('corner').querySelector('.a').textContent = a; $('corner').querySelector('.b').textContent = b; curCorner = key2; }
   $('corner').style.opacity = c ? 1 : 0;
   const tt = $('title');
-  if (t >= 13.9 && t < S_(4)){
-    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, 13.9, 14.3)) * (1 - ease(seg(t, S_(4)-.4, S_(4))));
+  if (t >= HE+.1 && t < S_(4)){
+    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, HE+.1, HE+.5)) * (1 - ease(seg(t, S_(4)-.4, S_(4))));
     if (curTitle !== 'title'){ tt.innerHTML = `<div class="s">你的错觉，不是你的错 · 第 2 期</div><div class="n">${spans('《为什么旁边的队，总比你快？》')}</div><div class="q">其实，这不全怪你运气差</div>`; curTitle = 'title'; }
-    tt.querySelectorAll('.n .ch').forEach((s,i)=>{ const k = easeOut(seg(t, 14.0 + i*.04, 14.35 + i*.04)); s.style.opacity = k; s.style.transform = `translateY(${(1-k)*30}px)`; });
-    tt.querySelector('.q').style.opacity = ease(seg(t, 14.8, 15.3));
+    tt.querySelectorAll('.n .ch').forEach((s,i)=>{ const k = easeOut(seg(t, HE+.2 + i*.04, HE+.55 + i*.04)); s.style.opacity = k; s.style.transform = `translateY(${(1-k)*30}px)`; });
+    tt.querySelector('.q').style.opacity = ease(seg(t, HE+1.0, HE+1.5));
   } else if (t >= END0){
     tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, END0, END0 + .6));
     if (curTitle !== 'end'){ tt.innerHTML = `<div class="n" style="font-size:84px">@Leo 出品</div><div class="refs">
@@ -728,12 +733,17 @@ const wp = (o, dy=0) => { const v = new THREE.Vector3(); o.getWorldPosition(v); 
 function labels(t, sh){
   const L = [];
   if (sh.sets.length === 1 && sh.sets[0] === 'market'){
-    L.push(['you', wp(SETS.market.you, 2.1), '你', t < 3.4 ? seg(t, 1.0, 1.4) : 1]);
+    L.push(['you', wp(SETS.market.you, 2.1), '你', t < 3.4 ? 0 : 1]);
     if (t >= S_(7) && t < S_(8)) SETS.market.jars.slice(0, 3).forEach((J, l) => {
       const k = SETS.market.k; L.push(['jar'+l, wp(J.jg, 0).add(V3(0, 1.0, .9)), `${k ? MC3.cum[k-1][l] : 0} 次`, seg(t, S_(7)+.2, S_(7)+.5), 'small nol' + (l === 1 ? ' gold' : '')]); });
   }
+  if (sh.sets.length === 1 && sh.sets[0] === 'market' && t < 3.4){
+    const done = [[.5, 1.9], [], [1.0, 2.4]].map(st => st.filter(x => t >= x + .5).length);
+    done.forEach((n, l) => L.push(['mq'+l, V3(LX[l], 2.5, .2), l === 1 ? `你这列：走了 ${n} 人` : `走了 ${n} 人`, seg(t, .2, .5), 'nol ' + (l === 1 ? 'red' : 'gold')])); }
+  if (sh.sets[0] === 'canteen' && t < 9.8){ const u = clamp(t - 6.6, 0, 3.2);
+    [-4.5, 0, 4.5].forEach((x, l) => { if (l === 0) return; const n = l === 1 ? 0 : Math.floor(u/.7); L.push(['cq'+l, V3(40 + x, 2.5, -.2), l === 1 ? `你这列：走了 ${n} 人` : `走了 ${n} 人`, seg(t, 6.8, 7.1), 'nol ' + (l === 1 ? 'red' : 'gold')]); }); }
   if (sh.sets[0] === 'road') L.push(['you', wp(SETS.road.you, 1.6), '你', 1]);
-  if (sh.sets[0] === 'canteen') L.push(['you', wp(SETS.canteen.you, 2.0), '你', 1]);
+  if (sh.sets[0] === 'canteen' && t >= 9.8) L.push(['you', wp(SETS.canteen.you, 2.0), '你', 1]);
   if (sh.sets[0] === 'hw' && !sh.sec3 && t >= S_(12)) L.push(['you', wp(SETS.hw.you, 1.4), '你', 1]);
   if (sh.sec3){ const st = SETS.hw.state;
     if (st.done && st.pick) L.push(['pick', V3(200 + st.pick.x, 2.0, st.pick.z), st.pick.slowSide ? '他在慢的一边' : '他在快的一边', seg(t, S_(19)+2.3, S_(19)+2.6), 'small gold']);
@@ -755,7 +765,7 @@ const HOOK_TXT = [['为什么',''],['旁边的队','g'],['，总比你',''],['�
 $('hook').querySelector('.t').innerHTML = HOOK_TXT.map(([s,c]) => [...s].map(ch => `<span class="hc ${c}">${ch}</span>`).join('')).join('');
 function hookUI(t){
   const el = $('hook'), t1 = el.querySelector('.t'), u = el.querySelector('.u'), bg = $('hookbg');
-  const big = t < 13.9, hide = (t >= 13.9 && t < S_(4)) || t >= END0;
+  const big = t < HE+.1, hide = (t >= HE+.1 && t < S_(4)) || t >= END0;
   if (hide){ el.style.opacity = 0; bg.style.opacity = 0; return; }
   const st = big ? .05 : S_(4);
   el.querySelectorAll('.hc').forEach((c, i) => {
@@ -763,7 +773,7 @@ function hookUI(t){
     c.style.opacity = k; c.style.filter = `blur(${(1-k)*16}px)`; c.style.transform = `scale(${lerp(1.25, 1, k)})`;
   });
   if (big){
-    const out = ease(seg(t, 13.4, 13.9));
+    const out = ease(seg(t, HE-.4, HE+.1));
     el.style.top = '56px'; t1.style.fontSize = '84px';
     t1.style.transform = `scale(${1 + .025*Math.max(0, Math.sin(t*Math.PI/1.6))**8})`;
     const ut = t < 6.5 ? t - .9 : t % 6.5; u.style.width = (620*easeOut(seg(ut, 0, 1.0))) + 'px'; u.style.opacity = (ut < 0 ? 0 : 1) * (1 - seg(ut, 5.6, 6.5));
@@ -781,7 +791,7 @@ const SFX = [
   [0.0, 'crowd', .45], [0.0, 'beep', .5], [.45, 'beep', .45], [.8, 'coins', .7], [1.6, 'coins', .6], [2.4, 'coins', .6], [1.0, 'pop', .4], [.4, 'tick', .7],
   [3.35, 'whoosh', .7], [3.4, 'engine', .6], [3.9, 'tick', .7], [4.4, 'whoosh', .4], [5.4, 'horn', .6], [5.0, 'engine', .5],
   [6.55, 'whoosh', .7], [6.6, 'crowd', .4], [7.1, 'tick', .7], [7.0, 'clank', .5], [7.7, 'clank', .5], [8.4, 'clank', .5], [9.1, 'clank', .5],
-  [9.75, 'whoosh', .9], [10.6, 'riser', .5], [13.9, 'boom', .8],
+  [9.75, 'whoosh', .9], [13.7, 'ding', .7], [14.2, 'riser', .5], [HE+.1, 'boom', .8],
   [S_(4) - .1, 'whoosh', .7], [S_(4) + .2, 'crowd', .3],
   ...Array.from({length: Math.floor((S_(7) - S_(5))/.8)}, (_, k) => [[S_(5) + k*.8, 'tick', .45], [S_(5) + k*.8 + .35, MC3.runs[k].win === 1 ? 'ding' : 'pop', .5]]).flat(),
   [S_(7) - .1, 'whoosh', .6], [S_(7) + .3, 'fill', .6], [S_(7) + 1.2, 'fill', .5], [E_(7) - .4, 'shimmer', .6],
@@ -830,7 +840,7 @@ window.setup = function(done){
     TEXDRAW.forEach(j => j()); done && done(); });
 };
 window.DURATION = DURATION;
-window.SUBS = SUBS;
+window.SUBS = ALLSUBS;
 window.STATS = {mc3: MC3.pct, mc4: MC4.pct, hwFinal: HWT.final, youLeft: SNAKE.youLeft, youRight: SNAKE.youRight, period: HW.period};
 if (MODE === 'overlay'){
   document.body.style.background = 'transparent'; document.documentElement.style.background = 'transparent'; $('stage').style.background = 'transparent';
