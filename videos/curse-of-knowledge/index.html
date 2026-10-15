@@ -488,7 +488,7 @@ function scLife(t){
   if (t >= s3 - .3){
     const k = ease(seg(t, s3 - .3, s3 + .2));
     g.save(); g.globalAlpha = k;
-    phone(1010, 600, 460, 520, '同事', [{side: 'r', text: '你可真行啊。', t: S_(14) + .2, size: 46, mark: t >= S_(16) ? '误会' : '', markCol: C.red2}], t);
+    phone(1010, 600, 460, 520, '同事', [{side: 'r', text: '你可真行啊。', t: S_(13) + .9, size: 46, mark: t >= S_(16) ? '误会' : '', markCol: C.red2}], t);
     // 发的人：在开玩笑
     person(610, 900, .95, {body: C.olive, expr: 'smirk', look: 1});
     bubble(600, 470, 300, 110, {kind: 'think', k: easeOut(seg(t, S_(15), S_(15) + .4)), tail: [610, 590], text: '开个玩笑～', size: 42});
@@ -523,7 +523,7 @@ function scOutro(t){
   table(960, 820, 1000);
   person(620, 790, 1.0, {body: C.gold2, look: 1, expr: 'happy'});
   person(1300, 790, 1.0, {body: C.mauve, look: -1, expr: t > S_(21) + 1 ? 'happy' : 'neutral'});
-  for (let i = 0; i < 6; i++){ const ph = clamp((t - S_(21) - i*.18)/1.8, 0, 1), x = lerp(640, 1300, ease(ph)), y = 470 - Math.sin(ph*Math.PI)*170 + (i%3)*24;
+  for (let i = 0; i < 6; i++){ const ph = clamp((t - S_(21) - i*.18)/1.8, 0, 1), x = lerp(640, 1300, ease(ph)), y = 400 - Math.sin(ph*Math.PI)*130 + (i%3)*24;
     note(x - 60 + i*22, y, .9, C.gold, t >= S_(21) ? 1 - seg(ph, .85, 1) : (i < 3 ? 1 : 0)); }
   if (t >= S_(22)){ const a = easeOut(seg(t, S_(22), S_(22) + .4)) * (1 - seg(t, END0 - .2, END0 + .3));
     text('敲的人', 620, 330, {size: 54, w: 900, col: `rgba(240,201,135,${a})`}); text('猜的人', 1300, 330, {size: 54, w: 900, col: `rgba(232,115,95,${a})`});
@@ -655,7 +655,7 @@ const SFX = [
   [S_(6) - .15, 'whoosh', .6], ...Array.from({length: 4}, (_, k) => [S_(7) + .2 + k*.9, 'knock', .35]),
   [S_(8) + .5, 'tick', .7], [S_(8) + 1.0, 'tick', .7], [S_(9) + .2, 'pop', .5],
   [S_(10) - .15, 'whoosh', .6], [S_(11), 'pop', .5], [S_(11) + .3, 'pop', .5], [S_(12), 'pop', .5],
-  [S_(13) - .3, 'whoosh', .6], [S_(14) + .2, 'send', .7], [S_(15), 'pop', .5], [S_(16) + .2, 'buzzer', .5],
+  [S_(13) - .3, 'whoosh', .6], [S_(13) + .9, 'send', .7], [S_(15), 'pop', .5], [S_(16) + .2, 'buzzer', .5],
   [S_(17) - .15, 'whoosh', .6], [S_(17) + .3, 'slide', .6], [S_(18) + .3, 'pop', .5], [S_(18) + 1.0, 'ding', .6], [S_(19) + .2, 'buzz', .3],
   [S_(20) - .15, 'whoosh', .6], ...melody(S_(21) + .1, .35).slice(0, 6),
   [S_(22), 'pop', .5], [END0, 'boom', .6],
