@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!--
+  《为什么你说得很清楚，别人还是听不懂？》· 系列「你的错觉，不是你的错」第 3 期 · 2D 纸黏土风 · @Leo
+  - 纯 Canvas 2D + DOM 文字层；window.render(t) 为纯时间函数，逐帧截图（render.py）
+  - 无背景音乐：音效时间表见 window.SFX_CUES，由 sfx.py 合成（敲击、八音盒旋律均为程序合成；《生日快乐》为公有领域）
+  - 片中百分比、倍数由页面代码现场算出；与字幕不一致直接报错
+-->
+<title>为什么你说得很清楚，别人还是听不懂</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@500;700&family=EB+Garamond:ital,wght@0,500;0,700;1,500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #1a120c; }
+  #stage { position: relative; width: 1920px; height: 1080px; }
+  #cv { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  .ui { position: absolute; z-index: 20; font-family: 'Noto Serif SC', serif; color: #F3E8CF;
+        text-shadow: 0 2px 10px rgba(20,10,4,.85), 0 0 2px rgba(20,10,4,.9); }
+  #watermark { top: 1028px; left: 56px; font: 500 24px 'Noto Sans SC'; color: rgba(243,232,207,.55); }
+  #check { top: 74px; left: 70px; }
+  #check .head { font: 500 30px 'Noto Serif SC'; letter-spacing: 6px; }
+  #check .head i { font: italic 500 34px 'EB Garamond', serif; letter-spacing: 1px; margin-left: 10px; }
+  #check .row { display: flex; align-items: center; gap: 14px; margin-top: 14px; font: 700 40px 'Noto Serif SC'; position: relative; }
+  #check .box { width: 34px; height: 34px; border: 3px solid #F3E8CF; border-radius: 3px; position: relative; flex: none; }
+  #check .box.on::after { content: ''; position: absolute; left: 8px; top: -6px; width: 12px; height: 26px;
+        border: solid #E7C98B; border-width: 0 5px 5px 0; transform: rotate(40deg); }
+  #check .box.x { border-color: #D8584A; }
+  #check .box.x::before, #check .box.x::after { content: ''; position: absolute; left: 13px; top: -2px; width: 3px; height: 32px; background: #D8584A; }
+  #check .box.x::before { transform: rotate(45deg); } #check .box.x::after { transform: rotate(-45deg); }
+  #check .row.cur::before { content: '-'; position: absolute; margin-left: -26px; }
+  #corner { top: 150px; right: 80px; text-align: right; }
+  #corner .a { font: italic 500 58px 'EB Garamond', serif; }
+  #corner .a::after { content: ''; display: block; height: 3px; width: 140px; margin: 6px 0 0 auto; background: #C8463A; }
+  #corner .b { font: 500 34px 'Noto Serif SC'; letter-spacing: 4px; margin-top: 12px; }
+  #subtitle { left: 0; right: 0; top: 962px; text-align: center; font: 900 60px 'Noto Serif SC'; letter-spacing: 2px; }
+  #subtitle .ch { display: inline-block; }
+  #subtitle .em { color: #F0C987; }
+  #subtitle .red { color: #E8735F; text-decoration: underline; text-underline-offset: 10px; text-decoration-thickness: 3px; }
+  #title { position: absolute; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
+  #title .s { font: 500 30px 'Noto Serif SC'; letter-spacing: 12px; color: rgba(240,201,135,.9); }
+  #title .n { font: 900 76px 'Noto Serif SC'; color: #F0C987; letter-spacing: 3px; text-shadow: 0 6px 40px rgba(0,0,0,.6); }
+  #title .q { font: 500 40px 'Noto Serif SC'; color: #F3E8CF; }
+  #title .ch { display: inline-block; }
+  #title .refs { font: italic 500 28px 'EB Garamond', serif; color: rgba(243,232,207,.85); text-align: center; line-height: 1.7; margin-top: 18px; }
+  #title .note { font: 500 26px 'Noto Serif SC'; color: rgba(243,232,207,.6); margin-top: 18px; }
+  #hook { position: absolute; left: 0; right: 0; z-index: 25; text-align: center; font-family: 'Noto Serif SC', serif; color: #F6ECD6; pointer-events: none;
+           text-shadow: 0 3px 14px rgba(15,8,3,.95), 0 0 3px rgba(15,8,3,.95); }
+  #hook .t { display: inline-block; font-weight: 900; letter-spacing: 4px; }
+  #hook .hc { display: inline-block; }
+  #hook .g { color: #F0C987; } #hook .r { color: #EE7A62; }
+  #hook .u { height: 5px; margin: 10px auto 0; background: linear-gradient(90deg, rgba(240,201,135,0), #F0C987 20%, #F0C987 80%, rgba(240,201,135,0)); }
+  #hookbg { position: absolute; left: 0; right: 0; top: 0; height: 240px; z-index: 24; pointer-events: none;
+           background: linear-gradient(180deg, rgba(20,11,5,.62), rgba(20,11,5,0)); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+  <div id="hookbg"></div>
+  <div id="hook"><div class="t"></div><div class="u"></div></div>
+  <div id="check" class="ui"></div>
+  <div id="corner" class="ui"><div class="a"></div><div class="b"></div></div>
+  <div id="subtitle" class="ui"></div>
+  <div id="watermark" class="ui">@Leo</div>
+  <div id="title"></div>
+</div>
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const W = 1920, H = 1080;
+const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const ease = t => t<.5 ? 2*t*t : 1-((-2*t+2)**2)/2;
+const easeOut = t => 1-(1-t)**3;
+const backOut = t => { const c = 1.9; return 1 + (c+1)*(t-1)**3 + c*(t-1)**2; };
+const seg = (t,a,b) => clamp((t-a)/(b-a),0,1);
+function mulberry32(seed){ return function(){ let t = seed += 0x6D2B79F5;
+  t = Math.imul(t ^ t>>>15, t|1); t ^= t + Math.imul(t ^ t>>>7, t|61);
+  return ((t ^ t>>>14)>>>0)/4294967296; }; }
+const SERIF = "'Noto Serif SC', serif", SANS = "'Noto Sans SC', sans-serif", GAR = "'EB Garamond', serif";
+const C = { cream:'#F3E8CF', paper:'#EFE4CF', ink:'#3A2614', gold:'#F0C987', gold2:'#E0B66A', red:'#E8735F', red2:'#B5352A',
+  olive:'#7D8A4E', brown:'#7A5235', mauve:'#8A5F6B', sage:'#6F7D6A', clay:'#B98A64', skin:'#E8C6A0', wood:'#6B4428', wood2:'#8A5A35' };
+const hanLen = s => s.replace(/<[^>]+>/g,'').replace(/[A-Za-z0-9.%]+/g,'A').replace(/[\s，。、；：？！“”‘’「」《》（）—…,.;:?!"'()\-]/g,'').length;
+
+/* ================= 实验数字（Newton 1990，经 Heath & Heath, HBR 2006 转述） ================= */
+const TAP = { songs: 120, hits: 3, predicted: 50 };
+TAP.actual = TAP.hits / TAP.songs * 100;          // 2.5
+TAP.ratio = TAP.predicted / TAP.actual;           // 20
+if (Math.abs(TAP.actual - 2.5) > 1e-9 || Math.abs(TAP.ratio - 20) > 1e-9) throw new Error('实验数字与字幕不一致');
+
+/* ================= 旋律：《生日快乐》前两句（公有领域） ================= */
+const BEAT = .42;
+const MEL = [ // [拍, 频率, 歌词]
+  [0, 392.00, '祝'], [.75, 392.00, '你'], [1, 440.00, '生'], [2, 392.00, '日'], [3, 523.25, '快'], [4, 493.88, '乐'],
+  [6, 392.00, '祝'], [6.75, 392.00, '你'], [7, 440.00, '生'], [8, 392.00, '日'], [9, 587.33, '快'], [10, 523.25, '乐'] ];
+const TAPLEN = 12 * BEAT;
+
+/* ================= 字幕（先定字幕，再按字幕排画面） ================= */
+const SUBS = [
+  [0.15, 3.4,  '你说得很清楚，别人却<em>听不懂</em>？'],
+  [3.5, 6.6,   '教爸妈用手机，说了三遍，还是<em>找不到</em>；'],
+  [6.7, 9.8,   '汇报讲完，老板问：所以你想<em>说什么</em>？'],
+  [9.9, 13.0,  '吵架时你喊：我早就<em>说过了</em>啊！'],
+  [13.1, 16.6, '这在心理学里，叫<em>「知识的诅咒」</em>。'],
+];
+const HE = 16.7;                 // 开场结束、标题卡开始
+const G0 = HE + 2.8;             // 游戏开始
+const KT1 = G0 + 3.4, KT2 = G0 + 15.5, KT3 = G0 + 21.1;   // 三次敲击 / 旋律起点
+SUBS.push(
+  [G0, G0 + 3.1,          '下面这段敲击，是一首<em>人人会唱</em>的歌。'],
+  [G0 + 3.2, KT1 + TAPLEN + .6, '仔细听，猜猜是哪首？'],
+  [KT1 + TAPLEN + .7, KT1 + TAPLEN + 3.7, '倒数 3 秒，想好答案。'],
+  [KT1 + TAPLEN + 3.8, KT2 - .6, '答案是：<em>《生日快乐》</em>。'],
+  [KT2 - .5, KT3 - .5,   '这次带上旋律，再听一遍。'],
+  [KT3 - .4, KT3 + TAPLEN + .8, '现在只听敲击，是不是突然觉得<em>很明显</em>？'],
+);
+const GE = KT3 + TAPLEN + .9;
+SUBS.push([GE, GE + 3.2, '敲的人，一直听到的就是<em>这个版本</em>。']);
+const NG = SUBS.length;          // 正文第一句的下标
+const BODY = [   // [文本, 段首?]
+  ['1990年，斯坦福一位心理学研究生做过这个实验。', 1],
+  ['一人敲歌，另一人猜歌名。'],
+  ['敲之前，先让敲的人估计：对方能猜中几成？'],
+  ['他们估计：<em>一半</em>。'],
+  [`结果敲了${TAP.songs}首，对方只猜中<red>${TAP.hits}首</red>。`],
+  [`实际只有<red>${TAP.actual}%</red>，敲的人高估了整整<em>${TAP.ratio}倍</em>。`],
+  ['因为敲的时候，脑子里一直在<em>放旋律</em>；', 1],
+  ['听的人，只听到一串<em>咚咚咚</em>。'],
+  ['这段旋律，还<em>关不掉</em>。'],
+  ['一旦知道答案，就很难再假装不知道。'],
+  ['生活里，你也常是那个<em>敲桌子</em>的人。', 1],
+  ['你说「点右上角」时，脑子里有整个手机屏幕；'],
+  ['爸妈听到的，只有<em>几个字</em>。'],
+  ['打字聊天更难，因为连<em>语气</em>都没了。'],
+  ['2005年的一组实验发现：发消息的人，'],
+  ['普遍以为对方读得懂自己的语气。'],
+  ['结果常常是：你在开玩笑，对方<red>当了真</red>。'],
+  ['那怎么办？先给一个<em>具体的例子</em>；', 1],
+  ['再请对方用<em>自己的话</em>讲一遍。'],
+  ['讲不出来，说明旋律还在你脑子里。'],
+  ['所以，不是你说不清楚，', 1],
+  ['是你忘了：别人没听过那段<em>旋律</em>。'],
+  ['你更常是<em>敲的人</em>，还是<em>猜的人</em>？评论区说说。'],
+];
+{ let t = GE + 3.5;
+  BODY.forEach(([txt, sec], i) => { if (i && sec) t += .3; const d = Math.max(2.4, hanLen(txt)/4.9 + .15);
+    SUBS.push([+t.toFixed(2), +(t+d).toFixed(2), txt]); t += d + .08; }); }
+const S_ = i => SUBS[NG + i][0], E_ = i => SUBS[NG + i][1];   // 正文第 i 句
+const END0 = E_(BODY.length - 1) + .3, DURATION = +(END0 + 5.5).toFixed(2);
+
+/* ================= 画布与背景 ================= */
+const cv = document.getElementById('cv'), g = cv.getContext('2d');
+const grain = document.createElement('canvas'); grain.width = 480; grain.height = 270;
+{ const gc = grain.getContext('2d'), id = gc.createImageData(480, 270), r = mulberry32(11);
+  for (let i = 0; i < id.data.length; i += 4){ const v = 128 + (r() - .5) * 60; id.data[i] = id.data[i+1] = id.data[i+2] = v; id.data[i+3] = 22; }
+  gc.putImageData(id, 0, 0); }
+function background(t){
+  const gr = g.createRadialGradient(W/2, H*.52, 80, W/2, H*.52, 1150);
+  gr.addColorStop(0, '#3b2a1c'); gr.addColorStop(.55, '#24180f'); gr.addColorStop(1, '#100a06');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.drawImage(grain, 0, 0, W, H);
+}
+
+/* ================= 绘图部件 ================= */
+function rr(x, y, w, h, r){ g.beginPath(); g.roundRect(x, y, w, h, r); }
+function shadowOn(b = 22, oy = 10, a = .4){ g.shadowColor = `rgba(8,4,2,${a})`; g.shadowBlur = b; g.shadowOffsetY = oy; }
+function shadowOff(){ g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0; }
+function clayFill(x, y, r, col){   // 黏土感：径向高光
+  const gr = g.createRadialGradient(x - r*.35, y - r*.4, r*.1, x, y, r*1.2);
+  gr.addColorStop(0, shade(col, 1.25)); gr.addColorStop(1, shade(col, .82)); return gr; }
+function shade(hex, k){ const n = parseInt(hex.slice(1), 16); const f = v => clamp(Math.round(v*k), 0, 255);
+  return `rgb(${f(n>>16)},${f(n>>8&255)},${f(n&255)})`; }
+function text(s, x, y, o = {}){
+  g.font = `${o.w || 700} ${o.size || 40}px ${o.font || SERIF}`; g.fillStyle = o.col || C.cream;
+  g.textAlign = o.align || 'center'; g.textBaseline = o.base || 'middle'; g.fillText(s, x, y); }
+
+/* 人物：o = {body, hair, expr, look, talk, gray, a} */
+function person(x, y, s, o = {}){
+  const body = o.body || C.olive, look = o.look ?? 0;
+  g.save(); g.globalAlpha *= o.a ?? 1;
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y + 4*s, 95*s, 16*s, 0, 0, 7); g.fill();
+  shadowOn(26*s, 10*s, .35);
+  g.fillStyle = clayFill(x, y - 90*s, 110*s, body); rr(x - 78*s, y - 175*s, 156*s, 178*s, [70*s, 70*s, 18*s, 18*s]); g.fill();
+  const hx = x + look*6*s, hy = y - 240*s + (o.bob || 0)*s;
+  g.fillStyle = clayFill(hx, hy, 66*s, C.skin); g.beginPath(); g.arc(hx, hy, 66*s, 0, 7); g.fill();
+  shadowOff();
+  // 头发
+  g.fillStyle = o.gray ? '#B9B0A4' : (o.hair || '#3a2618');
+  g.beginPath(); g.arc(hx, hy - 6*s, 68*s, Math.PI*1.05, Math.PI*1.95); g.quadraticCurveTo(hx, hy - 40*s, hx - 64*s, hy - 22*s); g.fill();
+  // 眼睛
+  const ex = look*10*s, ey = hy + 2*s, e = o.expr || 'neutral';
+  g.fillStyle = '#2a1a10';
+  for (const sx of [-1, 1]){ g.beginPath(); g.ellipse(hx + sx*22*s + ex, ey, 6.5*s, (e === 'wide' ? 10 : 8)*s, 0, 0, 7); g.fill(); }
+  g.strokeStyle = '#2a1a10'; g.lineWidth = 4.5*s; g.lineCap = 'round';
+  if (e === 'confused'){ g.beginPath(); g.moveTo(hx - 32*s + ex, ey - 22*s); g.lineTo(hx - 12*s + ex, ey - 18*s); g.moveTo(hx + 12*s + ex, ey - 26*s); g.lineTo(hx + 32*s + ex, ey - 32*s); g.stroke(); }
+  if (e === 'angry'){ g.beginPath(); g.moveTo(hx - 34*s + ex, ey - 24*s); g.lineTo(hx - 12*s + ex, ey - 14*s); g.moveTo(hx + 34*s + ex, ey - 24*s); g.lineTo(hx + 12*s + ex, ey - 14*s); g.stroke(); }
+  // 嘴
+  const my = hy + 32*s, mx = hx + ex*.8;
+  g.beginPath();
+  if (o.talk){ const k = .3 + .7*Math.abs(Math.sin(o.talk*13)); g.fillStyle = '#5a2a1c'; g.ellipse(mx, my, 11*s, 9*s*k, 0, 0, 7); g.fill(); }
+  else if (e === 'happy'){ g.arc(mx, my - 8*s, 16*s, .2*Math.PI, .8*Math.PI); g.stroke(); }
+  else if (e === 'smirk'){ g.moveTo(mx - 14*s, my); g.quadraticCurveTo(mx + 4*s, my + 6*s, mx + 18*s, my - 8*s); g.stroke(); }
+  else if (e === 'angry'){ g.arc(mx, my + 12*s, 14*s, 1.2*Math.PI, 1.8*Math.PI); g.stroke(); }
+  else if (e === 'confused' || e === 'wide'){ g.fillStyle = '#5a2a1c'; g.ellipse(mx, my, 7*s, 8*s, 0, 0, 7); g.fill(); }
+  else { g.moveTo(mx - 12*s, my); g.lineTo(mx + 12*s, my); g.stroke(); }
+  if (o.blush){ g.fillStyle = 'rgba(220,90,70,.35)'; for (const sx of [-1,1]){ g.beginPath(); g.ellipse(hx + sx*38*s + ex, ey + 20*s, 12*s, 7*s, 0, 0, 7); g.fill(); } }
+  g.restore();
+  return { hx, hy, hr: 66*s };
+}
+/* 气泡：kind = 'say' | 'think' */
+function bubble(x, y, w, h, o = {}){
+  const k = o.k ?? 1; if (k <= .001) return;
+  g.save(); g.globalAlpha *= Math.min(1, k*1.5);
+  const ax = o.tail ? o.tail[0] : x, ay = o.tail ? o.tail[1] : y + h/2 + 40;
+  g.translate(lerp(ax, x, backOut(k)), lerp(ay, y, backOut(k))); g.scale(backOut(k), backOut(k)); g.translate(-x, -y);
+  shadowOn(18, 8, .35); g.fillStyle = o.fill || C.cream;
+  rr(x - w/2, y - h/2, w, h, o.kind === 'think' ? h/2 : 26); g.fill();
+  if (o.tail){ const [tx, ty] = o.tail;
+    if (o.kind === 'think'){ for (const f of [.45, .72]){ const r = lerp(18, 8, f); g.beginPath(); g.arc(lerp(x, tx, f), lerp(y + h/2*Math.sign(ty - y), ty, f), r, 0, 7); g.fill(); } }
+    else { const bx = clamp(tx, x - w/2 + 50, x + w/2 - 50), by = ty > y ? y + h/2 - 4 : y - h/2 + 4;
+      g.beginPath(); g.moveTo(bx - 22, by); g.lineTo(lerp(bx, tx, .7), lerp(by, ty, .7)); g.lineTo(bx + 22, by); g.fill(); } }
+  shadowOff();
+  if (o.text){ const lines = o.text.split('\n'), fs = o.size || 46;
+    lines.forEach((ln, i) => text(ln, x, y + (i - (lines.length-1)/2)*fs*1.25, {size: fs, w: o.w || 900, col: o.col || C.ink})); }
+  if (o.draw) o.draw(x, y);
+  g.restore();
+}
+function note(x, y, s, col, a = 1){   // 八分音符
+  g.save(); g.globalAlpha *= a; g.fillStyle = col; g.strokeStyle = col; g.lineWidth = 5*s;
+  g.beginPath(); g.ellipse(x, y, 15*s, 11*s, -.4, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(x + 13*s, y - 4*s); g.lineTo(x + 13*s, y - 58*s); g.quadraticCurveTo(x + 30*s, y - 40*s, x + 36*s, y - 22*s); g.stroke();
+  g.restore();
+}
+/* 手机 */
+function phone(x, y, w, h, title, msgs, t, o = {}){
+  g.save(); g.globalAlpha *= o.a ?? 1;
+  shadowOn(30, 14, .45); g.fillStyle = '#20160f'; rr(x - w/2, y - h/2, w, h, 46); g.fill(); shadowOff();
+  g.fillStyle = '#EDE6D8'; rr(x - w/2 + 16, y - h/2 + 16, w - 32, h - 32, 34); g.fill();
+  g.fillStyle = '#D9CFBD'; rr(x - w/2 + 16, y - h/2 + 16, w - 32, 84, [34, 34, 0, 0]); g.fill();
+  text(title, x, y - h/2 + 60, {size: 34, w: 700, col: C.ink});
+  let yy = y - h/2 + 140;
+  for (const m of msgs){
+    const k = easeOut(seg(t, m.t, m.t + .3)); if (k <= 0) continue;
+    g.font = `700 ${m.size || 38}px ${SERIF}`; const tw = g.measureText(m.text).width, bw = tw + 52, bh = (m.size || 38) + 44;
+    const right = m.side === 'r', bx = right ? x + w/2 - 40 - bw : x - w/2 + 40;
+    g.save(); g.globalAlpha *= k; g.translate(0, (1 - k)*20);
+    g.fillStyle = right ? '#9BC27A' : '#FFFFFF'; rr(bx, yy, bw, bh, 18); g.fill();
+    text(m.text, bx + bw/2, yy + bh/2 + 2, {size: m.size || 38, w: 700, col: C.ink});
+    if (m.mark){ g.globalAlpha *= seg(t, m.t + .4, m.t + .7); text(m.mark, right ? bx - 18 : bx + bw + 18, yy + bh/2, {size: 30, w: 700, col: m.markCol || '#B5352A', align: right ? 'right' : 'left'}); }
+    g.restore();
+    yy += bh + 22;
+  }
+  g.restore();
+}
+/* 木桌 + 拳头敲击 */
+function table(cx, cy, w){
+  shadowOn(30, 16, .5);
+  g.fillStyle = C.wood; g.beginPath(); g.moveTo(cx - w/2 + 60, cy - 60); g.lineTo(cx + w/2 - 60, cy - 60); g.lineTo(cx + w/2, cy + 60); g.lineTo(cx - w/2, cy + 60); g.closePath(); g.fill();
+  shadowOff();
+  const gr = g.createLinearGradient(0, cy - 60, 0, cy + 60); gr.addColorStop(0, C.wood2); gr.addColorStop(1, C.wood);
+  g.fillStyle = gr; g.beginPath(); g.moveTo(cx - w/2 + 60, cy - 60); g.lineTo(cx + w/2 - 60, cy - 60); g.lineTo(cx + w/2, cy + 60); g.lineTo(cx - w/2, cy + 60); g.closePath(); g.fill();
+  g.fillStyle = '#4a2e1a'; g.fillRect(cx - w/2, cy + 60, w, 26);
+  g.strokeStyle = 'rgba(40,20,10,.35)'; g.lineWidth = 3;
+  for (let i = 0; i < 5; i++){ g.beginPath(); g.moveTo(cx - w/2 + 90 + i*20, cy - 40 + i*22); g.bezierCurveTo(cx - 100, cy - 50 + i*24, cx + 100, cy - 30 + i*22, cx + w/2 - 70, cy - 44 + i*24); g.stroke(); }
+}
+function fist(x, y, lift, arm = [x + 760, y - 150], sleeve = C.olive, s = 1){   // lift 0=贴桌, 1=抬起；arm=手臂起点
+  const yy = y - 44*s - lift*80*s;
+  g.save(); shadowOn(18, 8, .4);
+  g.lineCap = 'round'; g.strokeStyle = C.skin; g.lineWidth = 58*s;
+  const mx = lerp(arm[0], x, .55), my = lerp(arm[1], yy, .55);
+  g.beginPath(); g.moveTo(arm[0], arm[1]); g.lineTo(x + 30*s, yy); g.stroke();
+  g.strokeStyle = sleeve; g.lineWidth = 76*s; g.beginPath(); g.moveTo(arm[0], arm[1]); g.lineTo(mx, my); g.stroke();
+  g.fillStyle = clayFill(x, yy, 70*s, C.skin); rr(x - 66*s, yy - 44*s, 132*s, 88*s, 34*s); g.fill();
+  shadowOff();
+  g.fillStyle = shade(C.skin, .9);   // 指节
+  for (let i = 0; i < 4; i++){ g.beginPath(); g.arc(x - 45*s + i*30*s, yy + 38*s, 15*s, 0, Math.PI); g.fill(); }
+  g.strokeStyle = 'rgba(120,70,40,.45)'; g.lineWidth = 3*s;
+  for (let i = 1; i < 4; i++){ g.beginPath(); g.moveTo(x - 60*s + i*30*s, yy + 8*s); g.lineTo(x - 60*s + i*30*s, yy + 40*s); g.stroke(); }
+  g.fillStyle = clayFill(x - 40*s, yy - 20*s, 30*s, C.skin); rr(x - 70*s, yy - 34*s, 70*s, 34*s, 17*s); g.fill();   // 拇指
+  g.restore();
+}
+/* 敲击动画参数：给定起点，返回 [抬手量, 最近一次敲击后的秒数, 第几下] */
+function tapState(t, t0){
+  let last = -1;
+  MEL.forEach(([b], i) => { if (t >= t0 + b*BEAT) last = i; });
+  if (last < 0) return [Math.min(1, Math.max(0, (t - t0 + .5)/.4)), 99, -1];
+  const dt = t - (t0 + MEL[last][0]*BEAT), nx = MEL[last+1] ? t0 + MEL[last+1][0]*BEAT : 1e9;
+  const up = Math.min(seg(dt, .04, .16), 1 - seg(t, nx - .14, nx));
+  return [last === MEL.length - 1 ? seg(dt, .1, .5) : up, dt, last];
+}
+function ripples(x, y, dt, col){
+  for (const d of [0, .12]){ const u = seg(dt - d, 0, .6); if (u <= 0 || u >= 1) continue;
+    g.strokeStyle = col; g.globalAlpha = (1 - u)*.8; g.lineWidth = 6*(1 - u) + 1;
+    g.beginPath(); g.ellipse(x, y, 40 + u*220, 12 + u*60, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
+}
+
+/* ================= 场景 ================= */
+// 开场 1：说了很多 vs 一脸问号
+function scTalk(t){
+  const k = seg(t, .1, .5);
+  person(700, 900, 1.45, {body: C.olive, talk: t < 2.6 ? t : 0, look: 1});
+  person(1220, 900, 1.45, {body: C.mauve, expr: t > 1.6 ? 'confused' : 'neutral', look: -1});
+  bubble(600, 400, 440, 160, {k: easeOut(seg(t, .3, .7)), tail: [680, 520], text: '就是那个……\n你懂吧！', size: 44});
+  bubble(1330, 380, 160, 160, {k: easeOut(seg(t, 1.5, 1.8)), tail: [1250, 520], text: '？', size: 96, col: C.red2});
+}
+// 开场 2：教爸妈用手机
+function scPhone(t){
+  const u = t - 3.5;
+  phone(960, 600, 560, 660, '妈妈', [
+    {side: 'r', text: '点右上角那个设置', t: 3.6},
+    {side: 'l', text: '哪个右上角？', t: 4.3},
+    {side: 'r', text: '就是那个齿轮啊！', t: 4.95},
+    {side: 'l', text: '？？？', t: 5.6, size: 44},
+  ], t, {});
+  text(`第 ${Math.min(3, 1 + Math.floor(Math.max(0, u)/1.0))} 遍`, 1420, 520, {size: 54, w: 900, col: C.gold});
+}
+// 开场 3：汇报
+function scMeeting(t){
+  const u = t - 6.7;
+  // 投影幕 + 翻页
+  shadowOn(24, 12, .4); g.fillStyle = '#E9E0CC'; rr(560, 300, 640, 380, 14); g.fill(); shadowOff();
+  const pg = Math.min(10, 1 + Math.floor(u/.16));
+  text(`第 ${pg} / 10 页`, 880, 340, {size: 30, w: 500, col: '#7a6450'});
+  g.fillStyle = '#B9A88C'; for (let i = 0; i < 5; i++){ rr(620, 390 + i*52, 520 - ((i*137 + pg*61) % 200), 22, 8); g.fill(); }
+  g.fillStyle = '#C9A248'; for (let i = 0; i < 4; i++){ const hh = 40 + ((i*53 + pg*37) % 90); rr(960 + i*48, 640 - hh, 30, hh, 4); g.fill(); }
+  person(470, 900, 1.0, {body: C.olive, talk: u < 1.7 ? t : 0, look: 1});
+  person(1480, 900, 1.1, {body: '#4b4f5c', expr: u > 1.7 ? 'angry' : 'neutral', look: -1});
+  bubble(1450, 420, 460, 120, {k: easeOut(seg(u, 1.6, 1.95)), tail: [1460, 560], text: '所以，你想说什么？', size: 42});
+}
+// 开场 4：吵架
+function scArgue(t){
+  const u = t - 9.9;
+  person(700, 900, 1.4, {body: C.olive, expr: 'angry', talk: u < 1.5 ? t : 0, look: 1, bob: Math.sin(u*14)*3*(u < 1.5)});
+  person(1220, 900, 1.4, {body: C.mauve, expr: u > 1.4 ? 'confused' : 'wide', look: -1});
+  bubble(620, 420, 470, 120, {k: easeOut(seg(u, .15, .5)), tail: [690, 530], text: '我早就说过了啊！', size: 44});
+  bubble(1300, 400, 440, 120, {k: easeOut(seg(u, 1.5, 1.85)), tail: [1230, 530], text: '你什么时候说的？', size: 42});
+}
+// 点名：知识的诅咒
+function scName(t){
+  const u = t - 13.1, k = easeOut(seg(u, .1, .6)), st = seg(u, .35, .55);
+  g.save(); g.translate(960, 560); g.rotate(-.04); g.scale(lerp(1.6, 1, st), lerp(1.6, 1, st)); g.globalAlpha = k;
+  shadowOn(30, 14, .45); g.fillStyle = C.paper; rr(-430, -170, 860, 340, 18); g.fill(); shadowOff();
+  g.strokeStyle = C.red2; g.lineWidth = 8; rr(-400, -140, 800, 280, 10); g.stroke();
+  text('知识的诅咒', 0, -26, {size: 120, w: 900, col: C.red2});
+  text('The Curse of Knowledge', 0, 82, {size: 52, w: 500, font: GAR, col: '#5a4630'});
+  g.restore();
+}
+// 标题卡底：桌子远景
+function scTitleBg(t){ g.globalAlpha = .35; table(960, 760, 1300); g.globalAlpha = 1; }
+// 游戏：桌上敲击
+function scGame(t){
+  const cx = 960, cy = 780;
+  table(cx, cy, 1400);
+  let lift = 1, dt = 99, idx = -1, showNotes = 0, ghost = 0, t0 = null;
+  if (t >= KT1 - .6 && t < KT1 + TAPLEN + .5) t0 = KT1;
+  else if (t >= KT2 - .6 && t < KT2 + TAPLEN + .5){ t0 = KT2; showNotes = 1; }
+  else if (t >= KT3 - .6 && t < KT3 + TAPLEN + .5){ t0 = KT3; ghost = 1; }
+  if (t0 !== null) [lift, dt, idx] = tapState(t, t0);
+  ripples(cx, cy - 10, dt, showNotes ? C.gold : C.cream);
+  fist(cx, cy - 10, lift);
+  // "咚" 字
+  if (t0 !== null && dt < .5 && idx >= 0 && !showNotes && !ghost){ const a = 1 - seg(dt, .2, .5); text('咚', cx + (idx % 2 ? 230 : -230), cy - 200 - dt*80, {size: 76, w: 900, col: `rgba(243,232,207,${a})`}); }
+  // 敲击计数点
+  if (t0 !== null){ for (let i = 0; i < MEL.length; i++){ const on = i <= idx; g.fillStyle = on ? (showNotes ? C.gold : C.cream) : 'rgba(243,232,207,.18)';
+      g.beginPath(); g.arc(cx - 330 + i*60, 918, on ? 11 : 8, 0, 7); g.fill(); } }
+  // 旋律与歌词（第二遍实色，第三遍为"残影"）
+  if (showNotes || ghost){
+    const base = t0;
+    MEL.forEach(([b, f, ly], i) => {
+      const tt = base + b*BEAT, a = easeOut(seg(t, tt - .05, tt + .2)) * (ghost ? .32 : 1);
+      if (a <= 0) return;
+      const x = 275 + i*124, y = 440 - (Math.log2(f/392))*200;
+      note(x, y, 1.05, ghost ? C.cream : C.gold, a);
+      text(ly, x + 6, 520, {size: 46, w: 900, col: ghost ? `rgba(243,232,207,${a})` : `rgba(240,201,135,${a})`});
+    });
+  }
+  // 倒计时
+  const c0 = KT1 + TAPLEN + .7;
+  if (t >= c0 && t < c0 + 3){ const n = 3 - Math.floor(t - c0), f = (t - c0) % 1;
+    text(String(n), cx, 440, {size: lerp(260, 200, easeOut(f)), w: 900, font: GAR, col: `rgba(240,201,135,${1 - seg(f, .7, 1)})`}); }
+  // 揭晓卡
+  const r0 = KT1 + TAPLEN + 3.8;
+  if (t >= r0 && t < KT2 - .5){ const k = easeOut(seg(t, r0, r0 + .4)) * (1 - seg(t, KT2 - 1.0, KT2 - .5));
+    g.save(); g.globalAlpha = k; g.translate(cx, 430); g.scale(lerp(.8, 1, k), lerp(.8, 1, k));
+    shadowOn(24, 12, .45); g.fillStyle = C.paper; rr(-340, -100, 680, 200, 18); g.fill(); shadowOff();
+    text('《生日快乐》', 0, -6, {size: 92, w: 900, col: C.red2}); text('Happy Birthday to You', 0, 66, {size: 34, w: 500, font: GAR, col: '#5a4630'});
+    g.restore(); }
+}
+// 实验：两人 + 120 格
+const GRID = (() => { const r = mulberry32(1990), hits = new Set(); while (hits.size < TAP.hits) hits.add(Math.floor(r()*TAP.songs)); return hits; })();
+if (GRID.size !== TAP.hits) throw new Error('格子数不对');
+function scExp(t){
+  const s4 = S_(3), s5 = S_(4), s6 = S_(5);
+  const pk = 1 - ease(seg(t, s4 - .2, s4 + .5));   // 人物让位给格子
+  if (pk > 0){
+    g.save(); g.globalAlpha = pk;
+    table(960, 820, 1000);
+    const tp = tapState(S_(0) + ((t - S_(0)) % (TAPLEN + 1)), S_(0));
+    person(620, 790, 1.0, {body: C.gold2, look: 1, expr: 'happy'});
+    person(1300, 790, 1.0, {body: C.mauve, look: -1, expr: t > S_(1) + .8 ? 'confused' : 'neutral'});
+    ripples(830, 790, tp[1], C.cream); fist(830, 790, tp[0], [660, 690], C.gold2, .75);
+    text('敲的人', 620, 330, {size: 44, w: 900, col: C.gold}); text('猜的人', 1300, 330, {size: 44, w: 900, col: C.red});
+    bubble(460, 420, 170, 130, {kind: 'think', k: easeOut(seg(t, S_(0) + .4, S_(0) + .8)), tail: [570, 520], draw: (x, y) => { note(x - 30, y + 22, .8, C.ink); note(x + 30, y + 10, .8, C.ink); }});
+    bubble(1470, 420, 150, 130, {kind: 'think', k: easeOut(seg(t, S_(1) + .6, S_(1) + 1.0)), tail: [1360, 520], text: '？', size: 80, col: C.red2});
+    if (t >= S_(2)) bubble(860, 420, 360, 120, {k: easeOut(seg(t, S_(2) + .5, S_(2) + .9)), tail: [700, 520], text: '能猜中几成？', size: 44});
+    g.restore();
+  }
+  if (t < s4 - .2) return;
+  // 格子
+  const cols = 15, rows = 8, cw = 64, gx = 960 - cols*cw/2, gy = 330, ka = ease(seg(t, s4 - .1, s4 + .4));
+  const sweep = seg(t, s5 + .2, s5 + 2.6) * TAP.songs, bars = seg(t, s6, s6 + .1) > 0;
+  const gk = 1 - ease(seg(t, s6 - .1, s6 + .4)) * .93;
+  g.save(); g.globalAlpha = ka * gk;
+  let hit = 0;
+  for (let i = 0; i < TAP.songs; i++){
+    const x = gx + (i % cols)*cw, y = gy + Math.floor(i/cols)*cw;
+    const pred = i < TAP.predicted/100*TAP.songs && t >= s4 + .2 + i*.02;
+    g.fillStyle = 'rgba(243,232,207,.10)'; rr(x + 6, y + 6, cw - 12, cw - 12, 8); g.fill();
+    if (pred && t < s5 + .2){ g.strokeStyle = C.gold; g.setLineDash([8, 6]); g.lineWidth = 3; rr(x + 6, y + 6, cw - 12, cw - 12, 8); g.stroke(); g.setLineDash([]); }
+    if (i < sweep){ if (GRID.has(i)){ hit++; g.fillStyle = C.gold; rr(x + 4, y + 4, cw - 8, cw - 8, 10); g.fill(); }
+      else { g.strokeStyle = 'rgba(232,115,95,.55)'; g.lineWidth = 3; g.beginPath(); g.moveTo(x + 20, y + 20); g.lineTo(x + cw - 20, y + cw - 20); g.moveTo(x + cw - 20, y + 20); g.lineTo(x + 20, y + cw - 20); g.stroke(); } }
+  }
+  g.restore();
+  g.save(); g.globalAlpha = ka * gk;
+  if (t < s5 + .2) text(`估计能猜中：${Math.round(TAP.predicted/100*TAP.songs * seg(t, s4 + .2, s4 + 1.4))} 首`, 960, 900, {size: 48, w: 900, col: C.gold});
+  else text(`实际猜中：${hit} / ${Math.min(TAP.songs, Math.ceil(sweep))} 首`, 960, 900, {size: 48, w: 900, col: hit ? C.gold : C.cream});
+  g.restore();
+  // 对比条
+  if (bars){ const k = ease(seg(t, s6 + .1, s6 + 1.1)), y0 = 540;
+    [['估计', TAP.predicted, C.gold], ['实际', TAP.actual, C.red]].forEach(([lb, v, col], j) => {
+      const y = y0 + j*130, len = 820 * v/50 * k;
+      g.save(); shadowOn(18, 8, .4); g.fillStyle = col; rr(560, y - 36, Math.max(8, len), 72, 14); g.fill(); shadowOff(); g.restore();
+      text(lb, 530, y, {size: 50, w: 900, align: 'right', col: C.cream});
+      text(`${v}%`, 560 + Math.max(8, len) + 24, y, {size: 54, w: 700, font: GAR, align: 'left', col: col});
+    });
+    const k2 = easeOut(seg(t, s6 + 1.3, s6 + 1.7));
+    if (k2 > 0) text(`× ${TAP.ratio}`, 1660, 605, {size: 120 * lerp(1.4, 1, k2), w: 700, font: GAR, col: `rgba(240,201,135,${k2})`});
+  }
+}
+// 为什么：两个人的脑内
+function scHeads(t){
+  const s = S_(6), lx = 680, rx = 1340, by = 480;
+  person(lx, 950, 1.15, {body: C.gold2, look: 1, expr: 'happy'});
+  person(rx, 950, 1.15, {body: C.mauve, look: -1, expr: t >= S_(7) + .5 ? 'confused' : 'neutral'});
+  // 左：脑子里的旋律
+  bubble(lx, by, 520, 290, {kind: 'think', k: easeOut(seg(t, s, s + .4)), tail: [lx, 640], draw: (x, y) => {
+    g.strokeStyle = 'rgba(58,38,20,.25)'; g.lineWidth = 3;
+    for (let i = 0; i < 5; i++){ g.beginPath(); g.moveTo(x - 210, y - 50 + i*24); g.lineTo(x + 210, y - 50 + i*24); g.stroke(); }
+    const loud = t >= S_(8) ? 1.15 : 1;
+    for (let i = 0; i < 6; i++){ const ph = ((t - s)*.45 + i/6) % 1, nx = x - 200 + ph*400;
+      note(nx, y + 40 - ((i*37) % 5)*18, .95*loud, C.red2, Math.sin(ph*Math.PI)); } }});
+  // 右：只有咚和问号
+  bubble(rx, by, 440, 290, {kind: 'think', k: easeOut(seg(t, S_(7), S_(7) + .4)), tail: [rx, 640], draw: (x, y) => {
+    text('咚  咚  咚', x, y - 30, {size: 62, w: 900, col: C.ink}); text('？', x, y + 70, {size: 84, w: 900, col: C.red2}); }});
+  // 中间：只有"咚"传过去
+  for (let i = 0; i < 3; i++){ const ph = ((t - s)*.5 + i/3) % 1, a = Math.sin(ph*Math.PI) * seg(t, S_(7) - .3, S_(7) + .3);
+    text('咚', lerp(lx + 170, rx - 170, ph), 760 + Math.sin(ph*6)*12, {size: 56, w: 900, col: `rgba(243,232,207,${a})`}); }
+  // 关不掉：开关拨了又弹回
+  if (t >= S_(8) && t < S_(9) + .6){ const u = t - S_(8), a = easeOut(seg(u, .1, .4)) * (1 - seg(t, S_(9) + .2, S_(9) + .6));
+    const sw = Math.max(0, Math.sin(clamp((u - .5)/.7, 0, 1)*Math.PI));
+    g.save(); g.globalAlpha = a; const bx = lx - 60, sy = by - 205;
+    shadowOn(14, 6, .4); g.fillStyle = '#2b1e14'; rr(bx - 70, sy - 30, 140, 60, 30); g.fill(); shadowOff();
+    g.fillStyle = C.gold; g.beginPath(); g.arc(bx + 40 - 80*sw*.8, sy, 22, 0, 7); g.fill();
+    text('旋律：开', bx + 100, sy, {size: 38, w: 900, align: 'left', col: C.gold}); g.restore(); }
+  if (t >= S_(9)) bubble(lx, by - 205, 400, 96, {k: easeOut(seg(t, S_(9) + .3, S_(9) + .7)), text: '知道了，就忘不掉', size: 42});
+}
+// 生活：右上角 + 语气
+function scLife(t){
+  const s0 = S_(10), s3 = S_(13);
+  if (t < s3 - .1){
+    const k = 1 - ease(seg(t, s3 - .5, s3 - .1));
+    g.save(); g.globalAlpha = k;
+    person(780, 930, 1.05, {body: C.olive, talk: t > S_(11) && t < S_(11) + 2 ? t : 0, look: 1});
+    person(1380, 930, 1.05, {body: C.clay, gray: true, expr: t > S_(12) ? 'confused' : 'neutral', look: -1});
+    // 你脑子里：完整屏幕
+    bubble(640, 440, 360, 320, {kind: 'think', k: easeOut(seg(t, S_(11), S_(11) + .4)), tail: [740, 640], draw: (x, y) => {
+      g.fillStyle = '#20160f'; rr(x - 95, y - 140, 190, 280, 22); g.fill(); g.fillStyle = '#EDE6D8'; rr(x - 84, y - 128, 168, 256, 14); g.fill();
+      g.fillStyle = '#B9A88C'; for (let i = 0; i < 4; i++){ rr(x - 70, y - 70 + i*44, 140 - i*20, 18, 6); g.fill(); }
+      const pul = 1 + .15*Math.sin(t*8); g.fillStyle = C.red2; g.beginPath(); g.arc(x + 58, y - 106, 15*pul, 0, 7); g.fill();
+      g.strokeStyle = C.red2; g.lineWidth = 4; g.beginPath(); g.arc(x + 58, y - 106, 28*pul, 0, 7); g.stroke(); }});
+    bubble(1030, 560, 320, 100, {k: easeOut(seg(t, S_(11) + .3, S_(11) + .6)), tail: [880, 660], text: '点右上角！', size: 46});
+    // 爸妈听到的：几个字
+    bubble(1440, 470, 330, 170, {kind: 'think', k: easeOut(seg(t, S_(12), S_(12) + .4)), tail: [1400, 640], draw: (x, y) => {
+      ['右', '上', '角', '？'].forEach((c, i) => text(c, x - 105 + i*70, y + Math.sin(t*3 + i)*6, {size: 52, w: 900, col: i === 3 ? C.red2 : C.ink})); }});
+    g.restore();
+  }
+  if (t >= s3 - .3){
+    const k = ease(seg(t, s3 - .3, s3 + .2));
+    g.save(); g.globalAlpha = k;
+    phone(1010, 600, 460, 520, '同事', [{side: 'r', text: '你可真行啊。', t: S_(14) + .2, size: 46, mark: t >= S_(16) ? '误会' : '', markCol: C.red2}], t);
+    // 发的人：在开玩笑
+    person(610, 900, .95, {body: C.olive, expr: 'smirk', look: 1});
+    bubble(600, 470, 300, 110, {kind: 'think', k: easeOut(seg(t, S_(15), S_(15) + .4)), tail: [610, 590], text: '开个玩笑～', size: 42});
+    // 收的人：当真了
+    person(1480, 900, .95, {body: C.mauve, expr: t >= S_(16) ? 'angry' : 'neutral', look: -1});
+    bubble(1480, 470, 330, 110, {kind: 'think', k: easeOut(seg(t, S_(16) + .2, S_(16) + .6)), tail: [1480, 590], text: '这是在讽刺我？', size: 40, col: C.red2});
+    // 语气表盘
+    if (t >= S_(15)){ const a = easeOut(seg(t, S_(15) + .4, S_(15) + .8));
+      text('以为对方读得懂', 600, 382, {size: 38, w: 900, col: `rgba(240,201,135,${a})`}); }
+    g.restore();
+  }
+}
+// 怎么办：把旋律递过去
+function scFix(t){
+  const s = S_(17);
+  person(620, 900, 1.05, {body: C.gold2, expr: 'happy', look: 1, talk: t < s + 1.5 ? t : 0});
+  const ok = t < S_(19);
+  person(1300, 900, 1.05, {body: C.mauve, expr: ok ? (t > S_(18) + .5 ? 'happy' : 'neutral') : 'confused', look: -1, talk: t > S_(18) + .4 && t < S_(18) + 2 ? t : 0});
+  // 递过去的卡片：例子 + 音符
+  const u = ease(seg(t, s + .3, s + 1.4)), cx = lerp(760, 1080, u), cy = 560 - Math.sin(u*Math.PI)*90;
+  if (ok){ g.save(); g.translate(cx, cy); g.rotate(lerp(-.1, .05, u)); shadowOn(20, 10, .45); g.fillStyle = C.paper; rr(-120, -80, 240, 160, 14); g.fill(); shadowOff();
+    text('比如……', 0, -30, {size: 40, w: 900, col: C.ink}); note(-40, 50, .7, C.red2); note(30, 40, .7, C.red2); g.restore(); }
+  bubble(1340, 430, 400, 110, {k: easeOut(seg(t, S_(18) + .3, S_(18) + .7)) * (ok ? 1 : 0), tail: [1320, 560], text: '你是说……对吧？', size: 42});
+  if (t >= S_(18) + 1.0 && ok){ const a = easeOut(seg(t, S_(18) + 1.0, S_(18) + 1.3)); text('✓', 1590, 430, {size: 90, w: 900, font: SANS, col: `rgba(240,201,135,${a})`}); }
+  if (!ok){ const a = easeOut(seg(t, S_(19) + .2, S_(19) + .5));
+    bubble(1340, 430, 220, 110, {k: a, tail: [1320, 560], text: '呃……', size: 46});
+    for (let i = 0; i < 3; i++) note(560 + i*60, 420 + Math.sin(t*3 + i)*12, .9, C.gold, a); }
+}
+// 结尾：旋律飘到对面
+function scOutro(t){
+  const s = S_(20);
+  table(960, 820, 1000);
+  person(620, 790, 1.0, {body: C.gold2, look: 1, expr: 'happy'});
+  person(1300, 790, 1.0, {body: C.mauve, look: -1, expr: t > S_(21) + 1 ? 'happy' : 'neutral'});
+  for (let i = 0; i < 6; i++){ const ph = clamp((t - S_(21) - i*.18)/1.8, 0, 1), x = lerp(640, 1300, ease(ph)), y = 470 - Math.sin(ph*Math.PI)*170 + (i%3)*24;
+    note(x - 60 + i*22, y, .9, C.gold, t >= S_(21) ? 1 - seg(ph, .85, 1) : (i < 3 ? 1 : 0)); }
+  if (t >= S_(22)){ const a = easeOut(seg(t, S_(22), S_(22) + .4)) * (1 - seg(t, END0 - .2, END0 + .3));
+    text('敲的人', 620, 330, {size: 54, w: 900, col: `rgba(240,201,135,${a})`}); text('猜的人', 1300, 330, {size: 54, w: 900, col: `rgba(232,115,95,${a})`});
+    text('还是', 960, 330, {size: 40, w: 700, col: `rgba(243,232,207,${a*.8})`}); }
+}
+
+const SCENES = [
+  [0, 3.45, scTalk], [3.45, 6.65, scPhone], [6.65, 9.85, scMeeting], [9.85, 13.05, scArgue], [13.05, HE, scName],
+  [HE, G0, scTitleBg], [G0, GE + 3.3, scGame],
+  [GE + 3.3, S_(6) - .15, scExp], [S_(6) - .15, S_(10) - .15, scHeads], [S_(10) - .15, S_(17) - .15, scLife],
+  [S_(17) - .15, S_(20) - .15, scFix], [S_(20) - .15, DURATION + 1, scOutro],
+];
+function drawScene(t){
+  background(t);
+  for (const [a, b, fn] of SCENES){
+    if (t < a - .001 || t >= b) continue;
+    const kIn = a < .01 ? 1 : easeOut(seg(t, a, a + .3)), kOut = 1 - ease(seg(t, b - .25, b));
+    const z = 1 + .03*seg(t, a, b);
+    g.save(); g.globalAlpha = kIn * kOut; g.translate(W/2, H*.55); g.scale(z * lerp(.96, 1, kIn), z * lerp(.96, 1, kIn)); g.translate(-W/2, -H*.55);
+    fn(t); g.restore();
+  }
+  if (t >= END0){ g.fillStyle = `rgba(16,10,6,${.7*ease(seg(t, END0, END0 + .6))})`; g.fillRect(0, 0, W, H); }
+  if (t >= HE + .05 && t < G0){ g.fillStyle = `rgba(16,10,6,${.5*ease(seg(t, HE, HE + .4))*(1 - ease(seg(t, G0 - .4, G0)))})`; g.fillRect(0, 0, W, H); }
+}
+
+/* ================= 叠加层 ================= */
+const TICKS = [[.4, '说了没人懂'], [3.6, '说了三遍'], [8.3, '所以呢？'], [10.0, '我说过了啊']];
+const CHECK = ['敲歌实验', '为什么猜不出', '生活里的敲桌子', '怎么递旋律'], CHECK_T = [S_(0), S_(6), S_(10), S_(17)];
+const $ = id => document.getElementById(id);
+function spans(zh){ let out = '', cls = '';
+  for (const part of zh.split(/(<em>|<\/em>|<red>|<\/red>)/)){
+    if (part === '<em>'){ cls = 'em'; continue; } if (part === '<red>'){ cls = 'red'; continue; }
+    if (part === '</em>' || part === '</red>'){ cls = ''; continue; }
+    for (const ch of part) out += `<span class="ch ${cls}">${ch === ' ' ? '&nbsp;' : ch}</span>`; }
+  return out; }
+function corner(t){
+  if (t >= G0 && t < KT2 - .5) return ['Tap Test', '猜歌游戏 · 只有节奏'];
+  if (t >= S_(0) && t < S_(4)) return ['1990', '斯坦福 · 敲歌实验'];
+  if (t >= S_(4) && t < S_(6)) return [`${TAP.actual}%`, `猜中 ${TAP.hits} / ${TAP.songs} 首`];
+  if (t >= S_(14) && t < S_(17)) return ['2005', '心理学期刊 · 消息语气实验'];
+  return null;
+}
+let curSub = null, curCheck = null, curCorner = null, curTitle = null;
+function overlay(t){
+  const sub = SUBS.find(([a,b]) => t >= a && t < b), el = $('subtitle');
+  if (sub){ if (curSub !== sub){ el.innerHTML = spans(sub[2]); curSub = sub; }
+    el.style.opacity = 1 - ease(seg(t, sub[1]-.2, sub[1]));
+    el.querySelectorAll('.ch').forEach((s,i)=>{ const k = easeOut(seg(t, sub[0]+i*.025, sub[0]+i*.025+.22));
+      s.style.opacity = k; s.style.transform = `translateY(${(1-k)*16}px)`; });
+  } else { el.innerHTML = ''; curSub = null; }
+  let html = '';
+  if (t < HE){
+    const n = TICKS.filter(([s]) => t >= s).length;
+    if (n) html = `<div class="head">今日扎心 <i>×${n}</i></div>` + TICKS.slice(0,n).map(([,s],i)=>`<div class="row" style="opacity:${i===n-1?1:.55}"><div class="box x"></div>${s}</div>`).join('');
+  } else if (t >= CHECK_T[0] - .3 && t < S_(20) + 1.2){
+    const done = CHECK_T.filter(x => t >= x).length;
+    html = `<div class="head">看懂这件事 <i>${Math.min(done,4)}/4</i></div>` + CHECK.map((s,i)=>{
+      const st = i < done - 1 ? 'on' : '', cur = i === done - 1 ? 'cur' : '';
+      return `<div class="row ${cur}" style="opacity:${i < done ? 1 : .5}"><div class="box ${st}"></div>${s}</div>`; }).join('');
+  }
+  if (html !== curCheck){ $('check').innerHTML = html; curCheck = html; }
+  $('check').style.opacity = t < HE ? 1 - ease(seg(t, HE-.6, HE)) : ease(seg(t, CHECK_T[0]-.3, CHECK_T[0]+.2)) * (1 - ease(seg(t, S_(20)+.7, S_(20)+1.2)));
+  const c = corner(t);
+  const a = c ? c[0] : '', b = c ? c[1] : '', key2 = a + '|' + b;
+  if (key2 !== curCorner){ $('corner').querySelector('.a').textContent = a; $('corner').querySelector('.b').textContent = b; curCorner = key2; }
+  $('corner').style.opacity = c ? 1 : 0;
+  const tt = $('title');
+  if (t >= HE+.1 && t < G0){
+    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, HE+.1, HE+.5)) * (1 - ease(seg(t, G0-.4, G0)));
+    if (curTitle !== 'title'){ tt.innerHTML = `<div class="s">你的错觉，不是你的错 · 第 3 期</div><div class="n">${spans('《为什么你说得很清楚，别人还是听不懂？》')}</div><div class="q">先玩个游戏</div>`; curTitle = 'title'; }
+    tt.querySelectorAll('.n .ch').forEach((s,i)=>{ const k = easeOut(seg(t, HE+.2 + i*.03, HE+.55 + i*.03)); s.style.opacity = k; s.style.transform = `translateY(${(1-k)*30}px)`; });
+    tt.querySelector('.q').style.opacity = ease(seg(t, HE+1.2, HE+1.7));
+  } else if (t >= END0){
+    tt.style.display = 'flex'; tt.style.opacity = ease(seg(t, END0, END0 + .6));
+    if (curTitle !== 'end'){ tt.innerHTML = `<div class="n" style="font-size:84px">@Leo 出品</div><div class="refs">
+      E. L. Newton, <i>The Rocky Road from Actions to Intentions</i>, PhD dissertation, Stanford University, 1990<br>
+      C. Heath &amp; D. Heath, "The Curse of Knowledge," <i>Harvard Business Review</i>, Dec 2006<br>
+      J. Kruger, N. Epley, J. Parker &amp; Z.-W. Ng, "Egocentrism over e-mail," <i>JPSP</i> 89(6), 925–936, 2005<br>
+      C. Camerer, G. Loewenstein &amp; M. Weber, "The Curse of Knowledge in Economic Settings," <i>J. Polit. Econ.</i> 97(5), 1989</div>
+      <div class="note">本片情景均为示意演绎 · 敲击与旋律为程序合成 · 本片由 AI 生成</div>`; curTitle = 'end'; }
+  } else { tt.style.display = 'none'; }
+}
+/* 顶部大标题：逐字从模糊到清晰，全片常驻 */
+const HOOK_TXT = [['为什么你说得',''],['很清楚','g'],['，别人还是',''],['听不懂','g'],['？','r']];
+$('hook').querySelector('.t').innerHTML = HOOK_TXT.map(([s,c]) => [...s].map(ch => `<span class="hc ${c}">${ch}</span>`).join('')).join('');
+function hookUI(t){
+  const el = $('hook'), t1 = el.querySelector('.t'), u = el.querySelector('.u'), bg = $('hookbg');
+  const big = t < HE+.1, hide = (t >= HE+.1 && t < G0) || t >= END0;
+  if (hide){ el.style.opacity = 0; bg.style.opacity = 0; return; }
+  const st = big ? .05 : G0;
+  el.querySelectorAll('.hc').forEach((c, i) => {
+    const k = easeOut(seg(t, st + i*.05, st + i*.05 + .5));
+    c.style.opacity = k; c.style.filter = `blur(${(1-k)*16}px)`; c.style.transform = `scale(${lerp(1.25, 1, k)})`;
+  });
+  if (big){
+    const out = ease(seg(t, HE-.4, HE+.1));
+    el.style.top = '56px'; t1.style.fontSize = '64px';
+    t1.style.transform = `scale(${1 + .025*Math.max(0, Math.sin(t*Math.PI/1.6))**8})`;
+    const ut = t < 6.5 ? t - .9 : t % 6.5; u.style.width = (720*easeOut(seg(ut, 0, 1.0))) + 'px'; u.style.opacity = (ut < 0 ? 0 : 1) * (1 - seg(ut, 5.6, 6.5));
+    el.style.opacity = 1 - out; bg.style.opacity = (1 - out) * ease(seg(t, 0, .4));
+  } else {
+    const k = ease(seg(t, G0, G0+.6)) * (1 - ease(seg(t, END0-.5, END0)));
+    el.style.top = '34px'; t1.style.fontSize = '46px'; t1.style.transform = 'none';
+    u.style.width = '0px'; u.style.opacity = 0;
+    el.style.opacity = .92*k; bg.style.opacity = .55*k;
+  }
+}
+
+/* ================= 音效 ================= */
+const knocks = (t0, v = .9) => MEL.map(([b]) => [t0 + b*BEAT, 'knock', v]);
+const melody = (t0, v = .8) => MEL.map(([b, f]) => [t0 + b*BEAT, 'mb' + f.toFixed(2), v]);
+const SFX = [
+  [0.0, 'crowd', .35], [.3, 'pop', .6], [1.5, 'pop', .7],
+  [3.45, 'whoosh', .7], [3.6, 'send', .6], [4.3, 'pop', .6], [4.95, 'send', .6], [5.6, 'buzz', .4],
+  [6.65, 'whoosh', .7], ...Array.from({length: 10}, (_, k) => [6.75 + k*.16, 'paper', .25]), [8.3, 'thud', .7],
+  [9.85, 'whoosh', .7], [10.05, 'thud', .6], [11.4, 'pop', .6],
+  [13.1, 'riser', .45], [13.5, 'stamp', .9], [HE + .1, 'boom', .8],
+  [G0 - .1, 'whoosh', .6],
+  ...knocks(KT1), ...Array.from({length: 3}, (_, k) => [KT1 + TAPLEN + .7 + k, 'tick', .8]),
+  [KT1 + TAPLEN + 3.8, 'ding', .8], [KT1 + TAPLEN + 3.9, 'shimmer', .5],
+  ...knocks(KT2, .55), ...melody(KT2),
+  ...knocks(KT3),
+  [GE, 'shimmer', .4],
+  [S_(0) - .1, 'whoosh', .6], [S_(1) + .6, 'pop', .5], [S_(2) + .5, 'pop', .6],
+  ...Array.from({length: 6}, (_, k) => [S_(3) + .2 + k*.2, 'tick', .4]),
+  ...Array.from({length: 12}, (_, k) => [S_(4) + .2 + k*.2, 'tick', .35]),
+  ...[...GRID].map(i => [S_(4) + .2 + (i/TAP.songs)*2.4, 'ding', .6]),
+  [S_(5), 'fill', .5], [S_(5) + 1.3, 'stamp', .7],
+  [S_(6) - .15, 'whoosh', .6], ...Array.from({length: 4}, (_, k) => [S_(7) + .2 + k*.9, 'knock', .35]),
+  [S_(8) + .5, 'tick', .7], [S_(8) + 1.0, 'tick', .7], [S_(9) + .2, 'pop', .5],
+  [S_(10) - .15, 'whoosh', .6], [S_(11), 'pop', .5], [S_(11) + .3, 'pop', .5], [S_(12), 'pop', .5],
+  [S_(13) - .3, 'whoosh', .6], [S_(14) + .2, 'send', .7], [S_(15), 'pop', .5], [S_(16) + .2, 'buzzer', .5],
+  [S_(17) - .15, 'whoosh', .6], [S_(17) + .3, 'slide', .6], [S_(18) + .3, 'pop', .5], [S_(18) + 1.0, 'ding', .6], [S_(19) + .2, 'buzz', .3],
+  [S_(20) - .15, 'whoosh', .6], ...melody(S_(21) + .1, .35).slice(0, 6),
+  [S_(22), 'pop', .5], [END0, 'boom', .6],
+].filter(c => c[0] < DURATION - .3);
+window.SFX_CUES = SFX.map(([t, k, v]) => [Math.round(Math.max(0, t)*1000)/1000, k, v]);
+
+/* ================= 帧入口 ================= */
+window.render = function(t){ drawScene(t); overlay(t); hookUI(t); };
+window.setup = function(done){
+  const text = document.documentElement.innerHTML + SUBS.map(s=>s[2]).join('') + '你的错觉，不是你的错第期先玩个游戏出品本片情景均为示意演绎敲击与旋律为程序合成由生成今日扎心看懂这件事妈妈同事哪个右上角就是那个齿轮啊页所以你想说什么我早就说过了你什么时候说的知识的诅咒生日快乐估计能猜中实际首敲的人猜的人能猜中几成咚旋律开知道了忘不掉点右上角你可真行啊误会开个玩笑这是在讽刺我以为对方读懂比如呃还是遍';
+  const faces = ['500 20px "Noto Serif SC"','700 20px "Noto Serif SC"','900 20px "Noto Serif SC"','500 20px "Noto Sans SC"','700 20px "Noto Sans SC"','italic 500 20px "EB Garamond"','500 20px "EB Garamond"','700 20px "EB Garamond"'];
+  Promise.all(faces.map(f => document.fonts.load(f, text).catch(()=>null))).then(() => document.fonts.ready).then(() => { done && done(); });
+};
+window.DURATION = DURATION;
+window.SUBS = SUBS;
+window.STATS = {actual: TAP.actual, ratio: TAP.ratio, grid: [...GRID], KT: [KT1, KT2, KT3], END0};
+</script>
+</body>
+</html>
