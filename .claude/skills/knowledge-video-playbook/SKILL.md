@@ -146,6 +146,16 @@ created: "2026-10-13"
 - 按时长分桶，只和自己同一时长段的作品比；下期只改一个变量。
 - 复盘表模板见 `engagement-and-distribution.md` 7.4。
 
+## 做完一期：登记到创作工作台
+
+本系列（「你的错觉，不是你的错」@Leo）有一个创作工作台，汇总每期的片名、文案、提示词、出处、风险、排期和发布数据：
+https://claude.ai/artifact/21e1AzpwAH9TgoTqdJ6LLk
+
+成片做完、文案写好后，用 `ArtifactData` 工具（未加载时用 ToolSearch 搜 `select:ArtifactData`）登记：
+- collection `videos`，doc_id 用英文短名（提示词里给了"工作台 id"就用它）。先 `get`：已存在用 `update` 并带读到的 `version` 作 `if_version`；不存在用 `set`。
+- 至少写：`title`、`status`（成片 `done`，发布后 `published` + `publishedAt`）、`topic`、`category`、`family`、`oneLiner`、`caption`（`title`/`body`/`hashtags[]`/`authorComment`/`altTitles[]`）、`sources[]`（`{label,url}`）、`risks[]`、`durationSec`、`sizeMB`、`repoPath`、`branch`、`updatedAt`。完整字段见工作台"登记指令"页。
+- 写完读回一次，告诉用户登记了哪些字段。
+
 ## 十条铁律（跨文档汇总）
 
 1. 不写任何数字门槛，不把"流量池"当成官方机制。

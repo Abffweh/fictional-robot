@@ -1,0 +1,513 @@
+<title>错觉系列工作台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 布局：顶栏（系列名 + 状态计数 + 工具）→ 标签页（看板 / 发布排期 / 数据 / 登记指令）→ 右侧抽屉看单期详情 */
+:root{
+  --bg:#f3f1ec; --panel:#fbfaf7; --sunk:#e9e5dc; --line:#d8d2c5; --fg:#221c15; --muted:#6e6556;
+  --accent:#9a6a12; --accent-ink:#fff8e8; --accent-soft:#f1e3c2;
+  --ok:#2f7a4f; --warn:#b4620b; --bad:#b0392c; --info:#2d5f8a;
+  --c-idea:#8b8475; --c-prompt:#2d5f8a; --c-making:#b4620b; --c-done:#2f7a4f; --c-pub:#7a3f8f;
+  --display:"Noto Serif SC","Songti SC",serif; --body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#16120d; --panel:#1e1913; --sunk:#120f0b; --line:#3a3127; --fg:#efe6d6; --muted:#a89a85;
+  --accent:#e9bf6f; --accent-ink:#1a1209; --accent-soft:#3a2d17;
+  --ok:#6cc08f; --warn:#e8a04f; --bad:#ef7b6c; --info:#7fb2e0;
+  --c-idea:#a39a89; --c-prompt:#7fb2e0; --c-making:#e8a04f; --c-done:#6cc08f; --c-pub:#c99be0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#16120d; --panel:#1e1913; --sunk:#120f0b; --line:#3a3127; --fg:#efe6d6; --muted:#a89a85;
+  --accent:#e9bf6f; --accent-ink:#1a1209; --accent-soft:#3a2d17;
+  --ok:#6cc08f; --warn:#e8a04f; --bad:#ef7b6c; --info:#7fb2e0;
+  --c-idea:#a39a89; --c-prompt:#7fb2e0; --c-making:#e8a04f; --c-done:#6cc08f; --c-pub:#c99be0; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+/* 顶栏 */
+.top{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:16px}
+.brand .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--muted)}
+.brand h1{font-size:30px;font-weight:900;line-height:1.2}
+.brand h1 em{font-style:normal;color:var(--accent)}
+.counts{display:flex;flex-wrap:wrap;gap:8px}
+.count{display:flex;align-items:baseline;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:13px}
+.count b{font-family:var(--mono);font-size:16px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:999px;flex-wrap:wrap}
+.tab{border:0;background:transparent;padding:6px 14px;border-radius:999px;font-size:14px;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--panel);color:var(--fg);font-weight:700;box-shadow:0 1px 2px rgb(0 0 0/.12)}
+.spacer{flex:1}
+.field{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 10px;min-width:0}
+.search{width:220px;max-width:100%}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.btn.sm{padding:4px 9px;font-size:12.5px}
+
+/* 看板 */
+.board{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;overflow-x:auto;padding-bottom:6px}
+.col{background:var(--sunk);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.col h2{font-family:var(--body);font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;padding:2px 4px 6px}
+.col h2 .n{margin-left:auto;font-family:var(--mono);color:var(--muted);font-weight:400}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:6px;width:100%}
+.card:hover{border-color:var(--accent)}
+.card .t{font-weight:700;line-height:1.4}
+.card .meta{display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--muted);align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:1px 8px;font-size:12px;border:1px solid var(--line);white-space:nowrap}
+.chip.warn{border-color:var(--warn);color:var(--warn)}
+.chip.miss{border-style:dashed}
+.ep{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600}
+.empty-col{font-size:12.5px;color:var(--muted);padding:8px 4px}
+
+/* 排期 */
+.sched{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden}
+.srow{display:grid;grid-template-columns:56px 1fr auto;gap:14px;padding:12px 16px;border-top:1px solid var(--line);align-items:center}
+.srow:first-child{border-top:0}
+.srow .slot{font-family:var(--mono);font-size:20px;color:var(--muted);text-align:right}
+.srow .main{min-width:0;display:flex;flex-direction:column;gap:4px}
+.srow .warns{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--warn)}
+.srow.pub .slot{color:var(--c-pub)}
+.legend{font-size:13px;color:var(--muted)}
+
+/* 数据 */
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+th{font-weight:700;color:var(--muted);font-size:12px;letter-spacing:.04em;background:var(--sunk)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+
+/* 登记指令 */
+.guide{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.box h3{font-size:18px}
+pre{margin:0;background:var(--sunk);border-radius:8px;padding:12px;font:12.5px/1.65 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:520px;overflow:auto}
+
+/* 抽屉 */
+.scrim{position:fixed;inset:0;background:rgb(0 0 0/.35);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100%);background:var(--bg);border-left:1px solid var(--line);z-index:21;display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.dhead{display:flex;gap:12px;align-items:flex-start;padding:18px 20px 12px;border-bottom:1px solid var(--line)}
+.dhead h2{font-size:22px;line-height:1.35;flex:1;min-width:0}
+.dbody{overflow:auto;padding:16px 20px 40px;display:flex;flex-direction:column;gap:18px}
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec>.lab{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.1em;color:var(--muted);font-weight:700}
+.sec>.lab .btn{margin-left:auto;letter-spacing:0;font-weight:400}
+.textblock{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;white-space:pre-wrap;word-break:break-word;font-size:14px}
+.oneliner{font-family:var(--display);font-size:17px;border-left:3px solid var(--accent);padding:4px 0 4px 12px}
+.missing{color:var(--muted);font-size:13.5px;border:1px dashed var(--line);border-radius:8px;padding:10px 12px}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.kv label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.kv .field{font-size:14px;color:var(--fg);width:100%}
+textarea.field{width:100%;min-height:90px;resize:vertical}
+ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:14px}
+a{color:var(--info)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:13.5px;z-index:40}
+.banner{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:14px 16px;font-size:14px}
+.notice{color:var(--warn)}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);padding:0;width:min(520px,calc(100% - 32px))}
+dialog::backdrop{background:rgb(0 0 0/.35)}
+.dlg{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.dlg .row{display:flex;gap:10px;flex-wrap:wrap}
+.dlg label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);flex:1;min-width:140px}
+@media (max-width:720px){
+  .brand h1{font-size:24px}
+  .guide{grid-template-columns:1fr}
+  .board{grid-template-columns:repeat(5,minmax(240px,82vw))}
+  .search{width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="eyebrow">@LEO · 抖音 / B站 知识视频</div>
+      <h1>你的错觉，<em>不是你的错</em></h1>
+    </div>
+    <div class="counts" id="counts"></div>
+  </header>
+
+  <div class="bar">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="board" aria-selected="true">看板</button>
+      <button class="tab" role="tab" data-tab="sched" aria-selected="false">发布排期</button>
+      <button class="tab" role="tab" data-tab="stats" aria-selected="false">数据复盘</button>
+      <button class="tab" role="tab" data-tab="guide" aria-selected="false">登记指令</button>
+    </div>
+    <div class="spacer"></div>
+    <input class="field search" id="q" type="search" placeholder="搜标题、效应名、标签">
+    <select class="field" id="cat"><option value="">全部类别</option></select>
+    <button class="btn primary" id="newBtn" hidden>新建选题</button>
+  </div>
+
+  <div id="status" class="banner" hidden></div>
+
+  <section id="v-board" class="board" aria-label="看板"></section>
+  <section id="v-sched" hidden></section>
+  <section id="v-stats" hidden></section>
+  <section id="v-guide" hidden></section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="单期详情"></aside>
+<div class="toast" id="toast" hidden></div>
+
+<dialog id="newDlg">
+  <form class="dlg" id="newForm" method="dialog">
+    <h3>新建选题</h3>
+    <label>标题<input class="field" id="nf-title" required placeholder="为什么……？"></label>
+    <div class="row">
+      <label>效应名<input class="field" id="nf-topic" placeholder="如：语义饱和"></label>
+      <label>类别<input class="field" id="nf-cat" list="catlist" placeholder="如：认知与感知"></label>
+    </div>
+    <label>看完记住一句话<input class="field" id="nf-one"></label>
+    <datalist id="catlist"></datalist>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" type="button" id="nf-cancel">取消</button>
+      <button class="btn primary" type="submit">加入选题池</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+const STATUSES = [
+  {key:"idea",    name:"选题池",     color:"var(--c-idea)"},
+  {key:"prompt",  name:"提示词就绪", color:"var(--c-prompt)"},
+  {key:"making",  name:"制作中",     color:"var(--c-making)"},
+  {key:"done",    name:"已成片",     color:"var(--c-done)"},
+  {key:"published", name:"已发布",   color:"var(--c-pub)"},
+];
+const SMAP = Object.fromEntries(STATUSES.map(s=>[s.key,s]));
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let DB = null, USER = null, canWrite = false;
+let videos = [], meta = {}, openId = null, tab = "board";
+try { const t = localStorage.getItem("wb-tab"); if (t) tab = t; } catch(e) {}
+
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,1800); }
+async function copyText(text, label){
+  try { await navigator.clipboard.writeText(text); toast("已复制" + (label ? "：" + label : "")); }
+  catch(e){
+    const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select();
+    let ok=false; try{ ok=document.execCommand("copy"); }catch(_){}
+    ta.remove(); toast(ok ? "已复制" : "复制被拦截了，请手动选中文字复制");
+  }
+}
+const captionText = c => !c ? "" : [c.title, c.body, (c.hashtags||[]).map(h=>h.startsWith("#")?h:"#"+h).join(" ")].filter(Boolean).join("\n");
+
+/* ---------- 过滤 ---------- */
+function filtered(){
+  const q = $("q").value.trim().toLowerCase(), cat = $("cat").value;
+  return videos.filter(v => (!cat || v.category === cat) &&
+    (!q || [v.title, v.topic, v.oneLiner, (v.tags||[]).join(" "), v.family].join(" ").toLowerCase().includes(q)));
+}
+function sortKey(v){ return [v.episode ?? 999, v.slot ?? 999, v.title || ""]; }
+function cmp(a,b){ const x=sortKey(a), y=sortKey(b); for(let i=0;i<x.length;i++){ if(x[i]<y[i]) return -1; if(x[i]>y[i]) return 1; } return 0; }
+
+/* ---------- 顶部计数 ---------- */
+function renderCounts(){
+  $("counts").innerHTML = STATUSES.map(s => {
+    const n = videos.filter(v => (v.status||"idea") === s.key).length;
+    return `<span class="count"><span class="dot" style="background:${s.color}"></span>${s.name}<b>${n}</b></span>`;
+  }).join("");
+  const cats = [...new Set(videos.map(v=>v.category).filter(Boolean))].sort();
+  const cur = $("cat").value;
+  $("cat").innerHTML = `<option value="">全部类别</option>` + cats.map(c=>`<option ${c===cur?"selected":""}>${esc(c)}</option>`).join("");
+  $("catlist").innerHTML = cats.map(c=>`<option value="${esc(c)}">`).join("");
+}
+
+/* ---------- 看板 ---------- */
+function cardHTML(v){
+  const miss = [];
+  if ((v.status==="done"||v.status==="published") && !(v.caption && v.caption.body)) miss.push("缺文案");
+  if (v.status==="prompt" && !v.prompt) miss.push("缺提示词");
+  const w = warningsFor(v);
+  return `<button class="card" data-id="${esc(v.id)}">
+    <div class="meta">${v.episode!=null?`<span class="ep">第 ${v.episode} 期</span>`:""}${v.category?`<span class="chip">${esc(v.category)}</span>`:""}${v.style?`<span>${esc(v.style)}</span>`:""}</div>
+    <div class="t">${esc(v.title || v.id)}</div>
+    ${v.topic?`<div class="meta">${esc(v.topic)}</div>`:""}
+    ${(miss.length||w.length)?`<div class="meta">${miss.map(m=>`<span class="chip miss">${m}</span>`).join("")}${w.length?`<span class="chip warn">排期提醒 ${w.length}</span>`:""}</div>`:""}
+  </button>`;
+}
+function renderBoard(){
+  const list = filtered();
+  $("v-board").innerHTML = STATUSES.map(s => {
+    const items = list.filter(v => (v.status||"idea") === s.key).sort(cmp);
+    return `<div class="col"><h2><span class="dot" style="background:${s.color}"></span>${s.name}<span class="n">${items.length}</span></h2>
+      ${items.map(cardHTML).join("") || `<div class="empty-col">${s.key==="idea"?"还没有选题。让对话把新选题登记进来，或点“新建选题”。":"暂无"}</div>`}</div>`;
+  }).join("");
+}
+
+/* ---------- 排期提醒：相邻两期同一“机制家族”，或连续三期同一类别 ---------- */
+function scheduleList(){
+  // 已发布按发布日期，其余按 slot；没有 slot 的不进排期
+  const pub = videos.filter(v=>v.status==="published").sort((a,b)=>(a.publishedAt||"").localeCompare(b.publishedAt||"") || cmp(a,b));
+  const plan = videos.filter(v=>v.status!=="published" && v.slot!=null).sort((a,b)=>a.slot-b.slot);
+  return [...pub, ...plan];
+}
+function warningsFor(v){
+  const list = scheduleList(), i = list.findIndex(x=>x.id===v.id), out = [];
+  if (i < 0) return out;
+  const fam = x => x && x.family;
+  for (const j of [i-1, i+1]) {
+    const o = list[j];
+    if (o && fam(v) && fam(o) === fam(v)) out.push(`和相邻的《${o.title}》同属“${v.family}”，建议中间隔开`);
+    for (const r of (v.overlapWith||[])) if (o && o.id === r) out.push(`和相邻的《${o.title}》内容相近，建议隔开`);
+  }
+  for (let s = i-2; s <= i; s++) {
+    const tri = list.slice(Math.max(0,s), s+3);
+    if (s >= 0 && tri.length === 3 && v.category && tri.every(x=>x.category===v.category)) { out.push(`连续三期都是“${v.category}”，可以穿插别的类别`); break; }
+  }
+  return [...new Set(out)];
+}
+function renderSched(){
+  const list = scheduleList();
+  const unslotted = videos.filter(v=>v.status!=="published" && v.slot==null && v.status!=="idea").sort(cmp);
+  $("v-sched").innerHTML = `
+    <p class="legend">已发布的按发布日期排在前面，后面是计划顺序（字段 <span class="mono">slot</span>）。提醒规则：相邻两期属于同一“机制家族”（如“样本被筛过”），或连续三期同一类别。</p>
+    <div class="sched">${list.map((v,k)=>{ const w=warningsFor(v); return `
+      <div class="srow ${v.status==="published"?"pub":""}">
+        <div class="slot">${k+1}</div>
+        <div class="main">
+          <div><button class="btn sm" data-id="${esc(v.id)}">${esc(v.title)}</button></div>
+          <div class="meta muted" style="font-size:12.5px;display:flex;gap:8px;flex-wrap:wrap">
+            <span><span class="dot" style="background:${SMAP[v.status||"idea"].color}"></span> ${SMAP[v.status||"idea"].name}</span>
+            ${v.publishedAt?`<span class="mono">${esc(v.publishedAt)}</span>`:""}${v.category?`<span>${esc(v.category)}</span>`:""}${v.family?`<span>家族：${esc(v.family)}</span>`:""}
+          </div>
+          ${w.length?`<div class="warns">${w.map(x=>`<span>⚠ ${esc(x)}</span>`).join("")}</div>`:""}
+        </div>
+        <div></div>
+      </div>`; }).join("") || `<div class="srow"><div></div><div class="muted">还没有排期。在单期详情里填“计划顺序”。</div><div></div></div>`}
+    </div>
+    ${unslotted.length?`<p class="legend" style="margin-top:14px">还没排进顺序的：${unslotted.map(v=>`<button class="btn sm" data-id="${esc(v.id)}">${esc(v.title)}</button>`).join(" ")}</p>`:""}`;
+}
+
+/* ---------- 数据复盘 ---------- */
+const pct = (a,b) => (a!=null && b) ? (a/b*100).toFixed(1)+"%" : "—";
+const num = x => x==null||x==="" ? "—" : Number(x).toLocaleString("zh-CN");
+function renderStats(){
+  const pub = videos.filter(v=>v.status==="published").sort((a,b)=>(a.publishedAt||"").localeCompare(b.publishedAt||""));
+  $("v-stats").innerHTML = pub.length ? `
+    <p class="legend">数字由你在单期详情里填写（或让对话登记）。按时长段比较才有意义：同类时长的作品放在一起看。</p>
+    <div class="tablebox"><table>
+      <thead><tr><th>作品</th><th>发布</th><th>时长</th><th>播放</th><th>完播率</th><th>点赞</th><th>评论</th><th>收藏</th><th>分享</th><th>赞/播</th><th>藏/播</th><th>评/播</th></tr></thead>
+      <tbody>${pub.map(v=>{ const m=v.metrics||{}; return `<tr>
+        <td><button class="btn sm" data-id="${esc(v.id)}">${esc(v.title)}</button></td>
+        <td class="num">${esc(v.publishedAt||"—")}</td><td class="num">${v.durationSec?Math.round(v.durationSec)+"s":"—"}</td>
+        <td class="num">${num(m.plays)}</td><td class="num">${m.completion!=null?m.completion+"%":"—"}</td>
+        <td class="num">${num(m.likes)}</td><td class="num">${num(m.comments)}</td><td class="num">${num(m.favorites)}</td><td class="num">${num(m.shares)}</td>
+        <td class="num">${pct(m.likes,m.plays)}</td><td class="num">${pct(m.favorites,m.plays)}</td><td class="num">${pct(m.comments,m.plays)}</td></tr>`; }).join("")}
+      </tbody></table></div>` : `<div class="banner">还没有标成“已发布”的作品。发布后在详情里把状态改成“已发布”，填上日期和数据，这里就会出现对比表。</div>`;
+}
+
+/* ---------- 登记指令 ---------- */
+const SCHEMA = `videos/<doc_id>   （doc_id 用英文短名，如 ep03-curse-of-knowledge）
+{
+  "title":      "为什么……？",              // 片名
+  "episode":    3,                          // 期号（发布顺序，未定可省略）
+  "status":     "idea|prompt|making|done|published",
+  "topic":      "知识的诅咒",                // 效应 / 概念名
+  "category":   "认知与感知",                // 统计与概率 / 社会心理 / 人际关系 / 认知与感知 …
+  "family":     "样本被筛过",                // 机制家族：同家族相邻会提醒
+  "overlapWith":["ep08-liking-gap"],         // 内容相近的其他 doc_id
+  "oneLiner":   "看完记住的一句话",
+  "style":      "2D 纸黏土 | 3D 黏土微缩",
+  "durationSec":127, "sizeMB":16.2,
+  "repoPath":   "videos/curse-of-knowledge/", "branch":"…",
+  "caption": { "title":"…", "body":"…", "hashtags":["知识的诅咒","心理学"],
+               "authorComment":"…", "altTitles":["…"] },
+  "prompt":     "新对话用的完整提示词",
+  "sources":    [{"label":"Newton 1990（HBR 2006 转述）","url":"https://…"}],
+  "risks":      ["2.5% 只有二手来源"],
+  "slot":       12,                          // 计划发布顺序
+  "publishedAt":"2026-10-20",
+  "metrics":    {"plays":0,"completion":0,"likes":0,"comments":0,"favorites":0,"shares":0},
+  "review":     "复盘笔记", "notes":"其他备注",
+  "updatedAt":  "2026-10-18"
+}`;
+function guideText(){
+  const url = meta.url || "（本工作台的链接）";
+  return `做完之后，把本期登记到创作工作台：
+1. 工作台链接：${url}
+2. 用 ArtifactData 工具（若未加载，先用 ToolSearch 搜 "select:ArtifactData"）写入 collection "videos"。
+3. doc_id 用英文短名（如 ep12-tickle）。先 action "get" 看这期是否已存在：
+   - 已存在：用 action "update"，带上读到的 version 作为 if_version，只改需要改的字段；
+   - 不存在：用 action "set" 新建。
+4. 字段按工作台“登记指令”页的格式填：至少写 title、status、topic、category、oneLiner、caption（title/body/hashtags/authorComment/altTitles）、sources、risks、durationSec、repoPath、updatedAt。
+5. status：成片做完填 "done"；我说已发布再改 "published" 并填 publishedAt。
+6. 写完读回一次确认，告诉我登记了哪些字段。`;
+}
+function renderGuide(){
+  const t = guideText();
+  $("v-guide").innerHTML = `<div class="guide">
+    <div class="box"><h3>每期做完后，粘贴到那个对话里</h3>
+      <p class="muted" style="margin:0">那个对话会把片名、文案、出处、风险、成片参数写进这里。每次写入都需要你点一次批准。</p>
+      <pre id="guideTxt">${esc(t)}</pre>
+      <div><button class="btn primary" id="copyGuide">复制这段指令</button></div>
+      <h3 style="margin-top:8px">其他常用说法</h3>
+      <ul class="plain">
+        <li>“把 <span class="mono">ep12-tickle</span> 改成已发布，日期 10 月 20 日，播放 3.2 万，完播 31%，点赞 1200……”</li>
+        <li>“把这次的复盘写进工作台的 review 字段。”</li>
+        <li>“把今天给的两个新选题登记进工作台，状态 prompt，提示词放进 prompt 字段。”</li>
+      </ul>
+    </div>
+    <div class="box"><h3>字段格式</h3><pre>${esc(SCHEMA)}</pre></div>
+  </div>`;
+  $("copyGuide").onclick = () => copyText(t, "登记指令");
+}
+
+/* ---------- 抽屉 ---------- */
+function sec(label, inner, copy){ return `<div class="sec"><div class="lab">${label}${copy?`<button class="btn sm" data-copy="${copy}">复制</button>`:""}</div>${inner}</div>`; }
+function openDrawer(id){
+  openId = id; const v = videos.find(x=>x.id===id); if (!v) return closeDrawer();
+  const c = v.caption || {}, m = v.metrics || {};
+  const w = warningsFor(v);
+  const dis = canWrite ? "" : "disabled";
+  $("drawer").innerHTML = `
+    <div class="dhead">
+      <h2>${esc(v.title || v.id)}</h2>
+      <button class="btn" id="dclose" aria-label="关闭">关闭</button>
+    </div>
+    <div class="dbody">
+      <div class="meta" style="display:flex;flex-wrap:wrap;gap:6px;font-size:12.5px">
+        <span class="chip"><span class="dot" style="background:${SMAP[v.status||"idea"].color}"></span>${SMAP[v.status||"idea"].name}</span>
+        ${v.episode!=null?`<span class="chip">第 ${v.episode} 期</span>`:""}${v.topic?`<span class="chip">${esc(v.topic)}</span>`:""}${v.category?`<span class="chip">${esc(v.category)}</span>`:""}${v.family?`<span class="chip">家族：${esc(v.family)}</span>`:""}${v.style?`<span class="chip">${esc(v.style)}</span>`:""}
+        <span class="mono muted">${esc(v.id)}</span>
+      </div>
+      ${v.oneLiner?`<div class="oneliner">${esc(v.oneLiner)}</div>`:""}
+      ${w.length?`<div class="notice" style="font-size:13.5px">${w.map(x=>"⚠ "+esc(x)).join("<br>")}</div>`:""}
+
+      ${sec("发布文案 · 标题 + 正文 + 话题", c.body ? `<div class="textblock">${esc(captionText(c))}</div>` : `<div class="missing">还没登记文案。在做这期的对话里粘贴“登记指令”，让它写进来。</div>`, c.body ? "caption" : "")}
+      ${c.authorComment ? sec("作者自评论（出处与 AI 声明）", `<div class="textblock">${esc(c.authorComment)}</div>`, "comment") : ""}
+      ${(c.altTitles||[]).length ? sec("备选标题", `<ul class="plain">${c.altTitles.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`) : ""}
+      ${v.prompt ? sec("新对话提示词", `<div class="textblock" style="max-height:260px;overflow:auto;font-size:13px">${esc(v.prompt)}</div>`, "prompt") : ""}
+      ${(v.sources||[]).length ? sec("出处", `<ul class="plain">${v.sources.map(s=>`<li>${s.url?`<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label||s.url)}</a>`:esc(s.label)}</li>`).join("")}</ul>`) : ""}
+      ${(v.risks||[]).length ? sec("风险与分寸", `<ul class="plain">${v.risks.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>`) : ""}
+      ${(v.durationSec||v.sizeMB||v.repoPath) ? sec("成片", `<div class="muted" style="font-size:13.5px">${v.durationSec?`时长 <span class="mono">${Math.round(v.durationSec)}s</span>　`:""}${v.sizeMB?`大小 <span class="mono">${v.sizeMB}MB</span>　`:""}${v.repoPath?`源码 <span class="mono">${esc(v.repoPath)}</span>`:""}${v.branch?`　分支 <span class="mono">${esc(v.branch)}</span>`:""}</div>`) : ""}
+
+      ${sec("状态与排期", `<div class="kv">
+        <label>状态<select class="field" id="e-status" ${dis}>${STATUSES.map(s=>`<option value="${s.key}" ${s.key===(v.status||"idea")?"selected":""}>${s.name}</option>`).join("")}</select></label>
+        <label>期号<input class="field mono" id="e-episode" type="number" min="1" value="${v.episode??""}" ${dis}></label>
+        <label>计划顺序<input class="field mono" id="e-slot" type="number" min="1" value="${v.slot??""}" ${dis}></label>
+        <label>发布日期<input class="field mono" id="e-pub" type="date" value="${esc(v.publishedAt||"")}" ${dis}></label>
+      </div>`)}
+      ${sec("发布数据", `<div class="kv">
+        ${[["plays","播放"],["completion","完播率 %"],["likes","点赞"],["comments","评论"],["favorites","收藏"],["shares","分享"]].map(([k,n])=>`<label>${n}<input class="field mono" id="m-${k}" type="number" min="0" step="any" value="${m[k]??""}" ${dis}></label>`).join("")}
+      </div>`)}
+      ${sec("复盘笔记", `<textarea class="field" id="e-review" ${dis} placeholder="留存曲线哪里掉了、评论区在聊什么、下期只改一个变量……">${esc(v.review||"")}</textarea>`)}
+      ${sec("备注", `<textarea class="field" id="e-notes" ${dis}>${esc(v.notes||"")}</textarea>`)}
+      ${canWrite ? `<div style="display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap">
+        <button class="btn" id="e-del">删除这条</button>
+        <button class="btn primary" id="e-save">保存修改</button></div>` : `<p class="muted" style="font-size:13px">你只有查看权限，不能修改。</p>`}
+    </div>`;
+  $("drawer").hidden = false; $("scrim").hidden = false;
+  $("dclose").onclick = closeDrawer;
+  $("drawer").querySelectorAll("[data-copy]").forEach(b => b.onclick = () => {
+    const k = b.dataset.copy;
+    if (k==="caption") copyText(captionText(c), "发布文案");
+    if (k==="comment") copyText(c.authorComment, "作者自评论");
+    if (k==="prompt") copyText(v.prompt, "提示词");
+  });
+  if (canWrite){
+    $("e-save").onclick = () => saveEdits(v);
+    $("e-del").onclick = (ev) => {
+      const b = ev.currentTarget;
+      if (b.dataset.armed){ deleteVideo(v); return; }
+      b.dataset.armed = "1"; b.textContent = "再点一次确认删除"; b.style.borderColor = "var(--bad)"; b.style.color = "var(--bad)";
+      setTimeout(()=>{ if (b.isConnected){ delete b.dataset.armed; b.textContent="删除这条"; b.style.borderColor=""; b.style.color=""; } }, 3000);
+    };
+  }
+}
+function closeDrawer(){ openId = null; $("drawer").hidden = true; $("scrim").hidden = true; }
+const numOrNull = s => s === "" ? null : Number(s);
+async function saveEdits(v){
+  const metrics = {};
+  for (const k of ["plays","completion","likes","comments","favorites","shares"]) { const x = numOrNull($("m-"+k).value); if (x!=null) metrics[k]=x; }
+  const patch = {
+    status: $("e-status").value,
+    episode: numOrNull($("e-episode").value), slot: numOrNull($("e-slot").value),
+    publishedAt: $("e-pub").value || null,
+    metrics, review: $("e-review").value, notes: $("e-notes").value,
+    updatedAt: new Date().toISOString().slice(0,10),
+  };
+  for (const k of ["episode","slot","publishedAt"]) if (patch[k]==null) patch[k] = {"__delete__": true};
+  const b = $("e-save"); b.disabled = true; b.textContent = "保存中…";
+  try {
+    // update 不支持 __delete__ 标记：页面里改用整体合并
+    const body = Object.assign({}, v); delete body.id;
+    for (const [k,val] of Object.entries(patch)) { if (val && val.__delete__) delete body[k]; else body[k] = val; }
+    await DB.collection("videos").doc(v.id).set(body);
+    toast("已保存");
+  } catch(e){ toast(e && e.code === "invalid_argument" ? "没有写入权限" : "保存失败，稍后再试"); }
+  finally { if (b.isConnected){ b.disabled = false; b.textContent = "保存修改"; } }
+}
+async function deleteVideo(v){
+  try { await DB.collection("videos").doc(v.id).delete(); closeDrawer(); toast("已删除"); }
+  catch(e){ toast("删除失败"); }
+}
+
+/* ---------- 新建 ---------- */
+function slugify(s){
+  const ascii = (s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  return (ascii || "idea") + "-" + Date.now().toString(36);
+}
+$("newBtn").onclick = () => { $("newForm").reset(); $("newDlg").showModal(); };
+$("nf-cancel").onclick = () => $("newDlg").close();
+$("newForm").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const title = $("nf-title").value.trim(); if (!title) return;
+  const doc = { title, topic: $("nf-topic").value.trim() || null, category: $("nf-cat").value.trim() || null,
+    oneLiner: $("nf-one").value.trim() || null, status: "idea", updatedAt: new Date().toISOString().slice(0,10) };
+  Object.keys(doc).forEach(k => doc[k]==null && delete doc[k]);
+  try { await DB.collection("videos").doc(slugify($("nf-topic").value || title)).set(doc); $("newDlg").close(); toast("已加入选题池"); }
+  catch(e){ toast("保存失败"); }
+});
+
+/* ---------- 渲染与切换 ---------- */
+function render(){
+  renderCounts();
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab===tab)));
+  for (const k of ["board","sched","stats","guide"]) $("v-"+k).hidden = k !== tab;
+  ({board:renderBoard, sched:renderSched, stats:renderStats, guide:renderGuide})[tab]();
+  if (openId && !$("drawer").hidden) openDrawer(openId);
+}
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => { tab = t.dataset.tab; try{ localStorage.setItem("wb-tab", tab); }catch(e){} render(); });
+$("q").addEventListener("input", render); $("cat").addEventListener("change", render);
+document.addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b && !b.closest(".drawer")) openDrawer(b.dataset.id); });
+$("scrim").onclick = closeDrawer;
+document.addEventListener("keydown", e => { if (e.key==="Escape" && !$("drawer").hidden) closeDrawer(); });
+
+function showStatus(html){ const s=$("status"); s.innerHTML=html; s.hidden=!html; }
+
+(async function start(){
+  render();
+  showStatus("正在读取工作台数据……");
+  const claude = window.claude;
+  if (!claude || !claude.use){ showStatus("这个页面需要在 claude.ai 里打开，才能读取工作台数据。"); return; }
+  DB = await claude.use("db");
+  USER = await claude.use("user");
+  if (!DB){ showStatus("暂时读不到工作台数据：请确认已登录 claude.ai，并用有权限的账号打开。"); return; }
+  let cw = null; try { cw = USER ? await USER.canEdit() : null; } catch(e) {}
+  canWrite = cw === null ? true : !!cw;
+  $("newBtn").hidden = !canWrite;
+  DB.doc("meta/info").onSnapshot(s => { meta = s.exists ? s.data() : {}; if (tab==="guide") render(); }, () => {});
+  DB.collection("videos").onSnapshot(snap => {
+    videos = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    showStatus(videos.length ? "" : "工作台还是空的。每期做完后，在那个对话里粘贴“登记指令”页的那段话，它就会把这期登记进来。");
+    render();
+  }, err => { showStatus(err && err.code === "revoked" ? "访问权限已变更，请刷新页面。" : "数据连接中断了，请刷新页面。"); });
+})();
+</script>
